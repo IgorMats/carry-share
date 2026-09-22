@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>carry · position</title>
+<meta name="description" content="Closed position summary opened from the carry Telegram notifier. All data comes packed in the link; nothing is fetched or stored.">
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  :root {
+    --bg: var(--tg-theme-bg-color, #fffefa); --text: var(--tg-theme-text-color, #212529); --muted: var(--tg-theme-hint-color, #717780);
+    --border: #dddcd7; --raised: var(--tg-theme-secondary-bg-color, #f2f1ec);
+    --pos: #286548; --neg: #944b4e; --pos-bg: #dff0e5; --neg-bg: #f8e1e2;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --bg: var(--tg-theme-bg-color, #202327); --text: var(--tg-theme-text-color, #dce0e5); --muted: var(--tg-theme-hint-color, #a5adb7); --border: #3b4149; --raised: var(--tg-theme-secondary-bg-color, #272b30); --pos: #8bc7a4; --neg: #e29b9d; --pos-bg: #22352b; --neg-bg: #3a272a; }
+  }
+  :root[data-theme="dark"] { --bg: var(--tg-theme-bg-color, #202327); --text: var(--tg-theme-text-color, #dce0e5); --muted: var(--tg-theme-hint-color, #a5adb7); --border: #3b4149; --raised: var(--tg-theme-secondary-bg-color, #272b30); --pos: #8bc7a4; --neg: #e29b9d; --pos-bg: #22352b; --neg-bg: #3a272a; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); }
+  body { font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; padding: 20px 16px calc(24px + env(safe-area-inset-bottom)); max-width: 640px; margin: 0 auto; font-variant-numeric: tabular-nums; }
+  h1 { font-size: 19px; font-weight: 600; margin: 0; overflow-wrap: anywhere; }
+  .id { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .empty { color: var(--muted); padding: 40px 0; text-align: center; }
+  .hero { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 20px; margin: 20px 0; padding: 16px 0; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+  .hero .k { font-size: 11px; color: var(--muted); margin-bottom: 3px; }
+  .hero .v { font-size: 22px; font-weight: 500; line-height: 1.15; }
+  .hero .v small { font-size: 12px; color: var(--muted); font-weight: 400; margin-left: 4px; }
+  h3 { margin: 22px 0 10px; color: var(--muted); font-size: 11px; font-weight: 500; letter-spacing: .05em; text-transform: uppercase; }
+  dl { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 20px; margin: 0; }
+  dl > div { min-width: 0; }
+  dt { font-size: 11px; color: var(--muted); margin-bottom: 3px; }
+  dd { margin: 0; font-size: 13px; overflow-wrap: anywhere; }
+  .legs { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .leg { padding: 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--raised); min-width: 0; }
+  .leg .head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; font-size: 13px; }
+  .leg .head b { font-weight: 600; }
+  .side { display: inline-block; padding: 1px 7px; border-radius: 999px; font-size: 10px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; line-height: 1.4; }
+  .side.long { color: var(--pos); background: var(--pos-bg); } .side.short { color: var(--neg); background: var(--neg-bg); }
+  .move { font-size: 11px; font-weight: 500; white-space: nowrap; }
+  .leg dl { grid-template-columns: 1fr; gap: 7px; }
+  .pos { color: var(--pos); } .neg { color: var(--neg); }
+  .spreads { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .spreads div { min-width: 0; } .spreads .k { font-size: 10.5px; color: var(--muted); margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .spreads .v { font-size: 16px; font-weight: 500; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th, td { padding: 7px 5px; text-align: left; border-bottom: 1px solid var(--border); vertical-align: top; white-space: nowrap; }
+  th { font-size: 11px; font-weight: 400; color: var(--muted); padding-top: 0; }
+  th:first-child, td:first-child { padding-left: 0; } th:last-child, td:last-child { padding-right: 0; }
+  .num { text-align: right; white-space: nowrap; } td small { color: var(--muted); font-size: 10.5px; }
+  .note { margin: 20px 0 0; font-size: 11px; line-height: 1.5; color: var(--muted); }
+  @media (max-width: 380px) { .legs { grid-template-columns: 1fr; } .spreads { grid-template-columns: repeat(2, 1fr); } }
+</style>
+</head>
+<body>
+<main id="app"><p class="empty">Loading…</p></main>
+<script>
+(async () => {
+  const tg = window.Telegram?.WebApp;
+  // Inside Telegram the page follows the client's theme; elsewhere the system's.
+  try { tg?.ready(); tg?.expand(); if (tg?.initData) document.documentElement.dataset.theme = tg.colorScheme; } catch {}
+  const app = document.getElementById('app');
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch]);
+
+  // The summary travels in the direct link's startapp parameter, which Telegram
+  // hands to the page as start_param (and as ?tgWebAppStartParam=). `d` is
+  // for opening the page outside Telegram. Format: base64url(deflate-raw(JSON)).
+  const params = new URLSearchParams(location.search + '&' + location.hash.replace(/^#/, ''));
+  const raw = tg?.initDataUnsafe?.start_param || params.get('tgWebAppStartParam') || params.get('d');
+  async function decode(text) {
+    const bytes = Uint8Array.from(atob(text.replace(/-/g, '+').replace(/_/g, '/')), ch => ch.charCodeAt(0));
+    const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+    return JSON.parse(await new Response(stream).text());
+  }
+  let d;
+  try { d = raw ? await decode(raw) : null; } catch (error) { app.innerHTML = `<p class="empty">Could not read the link: ${esc(error.message)}</p>`; return; }
+  if (!d) { app.innerHTML = '<p class="empty">Open this page from a carry notification.</p>'; return; }
+
+  const na = 'N/A';
+  const money = v => v == null ? na : `${Number(v).toLocaleString('en-US', { maximumFractionDigits: 4 })}`;
+  const pct = (v, digits = 2) => v == null ? na : `${(Number(v) * 100).toFixed(digits)}%`;
+  const color = v => v == null || Number(v) === 0 ? '' : Number(v) > 0 ? 'pos' : 'neg';
+  const time = s => s == null ? na : new Date(s * 1000).toLocaleString('en-GB', { timeZone: 'America/Los_Angeles', hour12: false }).replace(',', ',') + ' PT';
+  const clock = s => new Date(s * 1000).toLocaleTimeString('en-GB', { timeZone: 'America/Los_Angeles', hour12: false });
+  const held = (a, b) => { if (a == null || b == null) return na; const m = Math.max(1, Math.round((b - a) / 60)); const dd = Math.floor(m / 1440), h = Math.floor((m % 1440) / 60), r = m % 60; return [[dd, 'd'], [h, 'h'], [r, 'm']].filter(([v]) => v > 0).map(([v, u]) => v + u).join(' '); };
+  const base = v => v == null ? na : Number(v).toLocaleString('en-US');
+  const modeLabel = { live: 'LIVE', paper: 'PAPER', mixed: 'Mixed', simulation: 'Simulation' }[d.m] ?? d.m;
+  const reasonLabel = { partial_entry_rollback: 'ROLLBACK', entry_not_filled: 'NOT FILLED', hedge_mismatch: 'HEDGE MISMATCH', basis_target_reached: 'TARGET', planned_net_reached: 'NET', partial_reversion_reached: 'PARTIAL', holding_time_elapsed: 'TIMEOUT', adverse_funding_exit: 'FUNDING', max_holding_elapsed: 'MAX HOLD', funding_estimate_unavailable: 'NO FUNDING DATA', basis_regime_changed: 'REGIME CHANGED', future_net_profit_not_attractive: 'NOT ATTRACTIVE', simulation_margin_guard: 'Margin guard', simulation_margin_threshold_breached: 'Margin threshold', demo_liquidation_proximity: 'LIQUIDATION', instrument_margin_tier_changed: 'Margin tier changed', scale_rollback_failed: 'SCALE ROLLBACK', manual: 'MANUAL', external_closure: 'LIQUIDATION' };
+  const reason = code => !code ? na : reasonLabel[code] ?? (code.startsWith('close_asap') ? 'ASAP' : code.startsWith('external') ? 'LIQUIDATION' : code.replaceAll('_', ' '));
+  const modelLabel = m => !m ? na : /minimal_15m/.test(m) ? 'Minimal 15m' : /executable_reversion/.test(m) ? 'Exec reversion' : /intraday/.test(m) ? 'Intraday' : /adaptive/.test(m) ? 'Adaptive basis' : m === 'historical_basis_v1' ? 'Historical basis' : m;
+  const move = (entry, exit, side) => {
+    if (entry == null || exit == null || Number(entry) <= 0) return '';
+    const ratio = (Number(exit) - Number(entry)) / Number(entry) * 100;
+    const good = ratio === 0 ? '' : (ratio > 0) === (side === 'long') ? 'pos' : 'neg';
+    return `<span class="move ${good}">${ratio > 0 ? '▲ +' : ratio < 0 ? '▼ ' : ''}${ratio.toFixed(2)}%</span>`;
+  };
+  const leg = (side, [venue, entry, exit, fees, funding, net]) => `<section class="leg"><div class="head"><span class="side ${side}">${side}</span><b>${esc(venue)}</b>${move(entry, exit, side)}</div><dl>
+    <div><dt>Entry</dt><dd>${esc(entry ?? na)}</dd></div><div><dt>Exit</dt><dd>${esc(exit ?? na)}</dd></div>
+    <div><dt>Fees</dt><dd>${money(fees)}${fees == null ? '' : ' USDT'}</dd></div><div><dt>Funding</dt><dd class="${color(funding)}">${money(funding)}${funding == null ? '' : ' USDT'}</dd></div>
+    <div><dt>Net</dt><dd><b class="${color(net)}">${money(net)}</b>${net == null ? '' : ' USDT'}</dd></div></dl></section>`;
+  const pair = (k, v, cls = '') => `<div><dt>${k}</dt><dd class="${cls}">${v}</dd></div>`;
+  const spreads = ['Signal', 'Entry', 'Exit', 'Target'].map((k, i) => `<div><div class="k">${k}</div><div class="v">${pct(d.sp?.[i])}</div></div>`).join('');
+  const scales = (d.sc ?? []).map(([at, rung, from, to, inc, heldSpread]) => `<tr><td>${clock(at)}</td><td>${rung ? `Rung ${rung}` : 'Manual'}</td><td class="num">${base(from)} → ${base(to)}</td><td class="num">${pct(inc)}${heldSpread == null ? '' : ` <small>vs ${pct(heldSpread)}</small>`}</td><td class="num">+${base(to - from)}</td></tr>`).join('');
+  app.innerHTML = `
+    <h1>${esc(modeLabel)} · ${esc(d.s)}</h1><div class="id">${esc(d.id)}</div>
+    <div class="hero">
+      <div><div class="k">Net P&amp;L</div><div class="v ${color(d.n)}">${money(d.n)}<small>USDT</small></div></div>
+      <div><div class="k">Net before funding</div><div class="v ${color(d.bf)}">${money(d.bf)}<small>USDT</small></div></div>
+      <div><div class="k">Net return, on notional</div><div class="v ${color(d.r)}">${pct(d.r, 4)}</div></div>
+      <div><div class="k">Return on margin</div><div class="v ${color(d.rm)}">${pct(d.rm, 4)}${d.lv ? `<small>${d.lv}x</small>` : ''}</div></div>
+    </div>
+    <h3>Legs</h3><div class="legs">${leg('long', d.L)}${leg('short', d.S)}</div>
+    <h3>Spread</h3><div class="spreads">${spreads}</div>
+    <h3>Trade</h3><dl>
+      ${pair('Opened', time(d.o))}${pair('Closed', time(d.c))}
+      ${pair('Held', held(d.o, d.c))}${pair('Close reason', esc(reason(d.cr)))}
+      ${pair('Model', esc(modelLabel(d.md)))}${pair('Execution mode', esc(modeLabel))}
+      ${pair('Capital', d.cap == null ? na : `${money(d.cap)} USDT`)}${pair('Base', base(d.b))}
+      ${pair('Funding', d.f == null ? na : `${money(d.f)} USDT`, color(d.f))}${pair('Status', esc((d.st || '').toUpperCase()))}
+    </dl>
+    ${scales ? `<h3>Scale-ins · ${d.sc.length}</h3><table><thead><tr><th>Time</th><th>Step</th><th class="num">Base</th><th class="num">Spread</th><th class="num">Added</th></tr></thead><tbody>${scales}</tbody></table>` : ''}
+    <p class="note">Prices and fees from the account fill records; net per venue is the engine's recorded leg component including that leg's fees and funding. Spread = (short − long) / mean(long, short): signal is venue midpoints at the decision, entry and exit are the fills, target is the frozen midpoint target. The price move beside a venue is exit against entry, coloured in the leg's direction. Snapshot packed at notification time.</p>`;
+})();
+</script>
+</body>
+</html>
