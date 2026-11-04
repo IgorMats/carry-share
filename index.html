@@ -3,122 +3,387 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
 <title>carry · position</title>
 <meta name="description" content="Closed position summary opened from the carry Telegram notifier. All data comes packed in the link; nothing is fetched or stored.">
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <style>
+  @font-face { font-family: CarryManrope; src: url('assets/manrope.woff2') format('woff2'); font-weight: 200 800; font-display: swap; }
+  @font-face { font-family: CarryScript; src: url('assets/kaushan-script.woff2') format('woff2'); font-weight: 400; font-display: swap; }
   :root {
-    --bg: var(--tg-theme-bg-color, #fffefa); --text: var(--tg-theme-text-color, #212529); --muted: var(--tg-theme-hint-color, #717780);
-    --border: #dddcd7; --raised: var(--tg-theme-secondary-bg-color, #f2f1ec);
-    --pos: #286548; --neg: #944b4e; --pos-bg: #dff0e5; --neg-bg: #f8e1e2;
+    --bg: #faf8f2; --panel: #f0eee6; --line: #deded6; --ink: #152333; --dim: #596878;
+    --gold: #86621b; --green: #006e51; --red: #b43a40;
+    --gold-soft: rgba(134, 98, 27, .06); --gold-edge: rgba(134, 98, 27, .35); --gold-tint: rgba(134, 98, 27, .11);
+    --green-tint: rgba(0, 110, 81, .1); --red-tint: rgba(180, 58, 64, .1);
+    color-scheme: light;
   }
   @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) { --bg: var(--tg-theme-bg-color, #202327); --text: var(--tg-theme-text-color, #dce0e5); --muted: var(--tg-theme-hint-color, #a5adb7); --border: #3b4149; --raised: var(--tg-theme-secondary-bg-color, #272b30); --pos: #8bc7a4; --neg: #e29b9d; --pos-bg: #22352b; --neg-bg: #3a272a; }
+    :root:not([data-theme="light"]) {
+      --bg: #0e151e; --panel: #151e29; --line: #2a3441; --ink: #f3f0e5; --dim: #a7b1bd;
+      --gold: #e9ce8a; --green: #5ee0b3; --red: #ff8d87;
+      --gold-soft: rgba(233, 206, 138, .06); --gold-edge: rgba(233, 206, 138, .35); --gold-tint: rgba(233, 206, 138, .11);
+      --green-tint: rgba(94, 224, 179, .1); --red-tint: rgba(255, 141, 135, .1);
+      color-scheme: dark;
+    }
   }
-  :root[data-theme="dark"] { --bg: var(--tg-theme-bg-color, #202327); --text: var(--tg-theme-text-color, #dce0e5); --muted: var(--tg-theme-hint-color, #a5adb7); --border: #3b4149; --raised: var(--tg-theme-secondary-bg-color, #272b30); --pos: #8bc7a4; --neg: #e29b9d; --pos-bg: #22352b; --neg-bg: #3a272a; }
+  :root[data-theme="dark"] {
+    --bg: #0e151e; --panel: #151e29; --line: #2a3441; --ink: #f3f0e5; --dim: #a7b1bd;
+    --gold: #e9ce8a; --green: #5ee0b3; --red: #ff8d87;
+    --gold-soft: rgba(233, 206, 138, .06); --gold-edge: rgba(233, 206, 138, .35); --gold-tint: rgba(233, 206, 138, .11);
+    --green-tint: rgba(94, 224, 179, .1); --red-tint: rgba(255, 141, 135, .1);
+    color-scheme: dark;
+  }
   * { box-sizing: border-box; }
-  html, body { margin: 0; background: var(--bg); color: var(--text); }
-  body { font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; padding: 20px 16px calc(24px + env(safe-area-inset-bottom)); max-width: 640px; margin: 0 auto; font-variant-numeric: tabular-nums; }
-  h1 { font-size: 19px; font-weight: 600; margin: 0; overflow-wrap: anywhere; }
-  .id { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; color: var(--muted); margin-top: 2px; }
-  .empty { color: var(--muted); padding: 40px 0; text-align: center; }
-  .hero { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 20px; margin: 20px 0; padding: 16px 0; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
-  .hero .k { font-size: 11px; color: var(--muted); margin-bottom: 3px; }
-  .hero .v { font-size: 22px; font-weight: 500; line-height: 1.15; }
-  .hero .v small { font-size: 12px; color: var(--muted); font-weight: 400; margin-left: 4px; }
-  h3 { margin: 22px 0 10px; color: var(--muted); font-size: 11px; font-weight: 500; letter-spacing: .05em; text-transform: uppercase; }
-  dl { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 20px; margin: 0; }
-  dl > div { min-width: 0; }
-  dt { font-size: 11px; color: var(--muted); margin-bottom: 3px; }
-  dd { margin: 0; font-size: 13px; overflow-wrap: anywhere; }
-  .legs { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-  .leg { padding: 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--raised); min-width: 0; }
-  .leg .head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; font-size: 13px; }
-  .leg .head b { font-weight: 600; }
-  .side { display: inline-block; padding: 1px 7px; border-radius: 999px; font-size: 10px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; line-height: 1.4; }
-  .side.long { color: var(--pos); background: var(--pos-bg); } .side.short { color: var(--neg); background: var(--neg-bg); }
-  .move { font-size: 11px; font-weight: 500; white-space: nowrap; }
-  .leg dl { grid-template-columns: 1fr; gap: 7px; }
-  .pos { color: var(--pos); } .neg { color: var(--neg); }
-  .spreads { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
-  .spreads div { min-width: 0; } .spreads .k { font-size: 10.5px; color: var(--muted); margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .spreads .v { font-size: 16px; font-weight: 500; }
-  table { width: 100%; border-collapse: collapse; font-size: 12px; }
-  th, td { padding: 7px 5px; text-align: left; border-bottom: 1px solid var(--border); vertical-align: top; white-space: nowrap; }
-  th { font-size: 11px; font-weight: 400; color: var(--muted); padding-top: 0; }
-  th:first-child, td:first-child { padding-left: 0; } th:last-child, td:last-child { padding-right: 0; }
-  .num { text-align: right; white-space: nowrap; } td small { color: var(--muted); font-size: 10.5px; }
-  .note { margin: 20px 0 0; font-size: 11px; line-height: 1.5; color: var(--muted); }
-  @media (max-width: 380px) { .legs { grid-template-columns: 1fr; } .spreads { grid-template-columns: repeat(2, 1fr); } }
+  html, body { margin: 0; background: var(--bg); color: var(--ink); }
+  body { font: 14px/1.5 CarryManrope, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; padding: 18px 16px calc(24px + env(safe-area-inset-bottom)); -webkit-text-size-adjust: 100%; }
+  .empty { color: var(--dim); padding: 40px 16px; text-align: center; }
+  svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+  .cd-window { width: 100%; max-width: 736px; margin: 0 auto; background: var(--bg); color: var(--ink); border: 1px solid var(--line); border-radius: 24px; overflow: hidden; box-shadow: 0 16px 48px rgba(0, 0, 0, .1); isolation: isolate; }
+  .cd-hero { position: relative; isolation: isolate; padding: 24px 28px 21px; min-height: 150px; background: #0a1018; color: #fbf4e2; overflow: hidden; }
+  .cd-art { position: absolute; inset: 0; z-index: -2; background: #0a1018 url('assets/profit.jpg') center 36% / cover no-repeat; }
+  .cd-art::after { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, rgba(9, 16, 25, .96) 0%, rgba(9, 16, 25, .87) 25%, rgba(9, 16, 25, .27) 58%, rgba(9, 16, 25, .02) 83%), linear-gradient(0deg, #0a1018 0%, rgba(10, 16, 24, .33) 14%, transparent 45%); }
+  .cd-window[data-event="loss"] .cd-art { background-image: url('assets/loss.jpg'); }
+  .cd-window[data-event="rollback"] .cd-art { background-image: url('assets/rollback.jpg'); }
+  .cd-window[data-event="unknown"] .cd-art { background-image: none; }
+  .cd-brandline { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
+  .cd-brand { font: 400 29px/1 CarryScript, cursive; color: #f3d78c; transform: rotate(-5deg); }
+  .cd-state { display: flex; align-items: center; gap: 8px; border: 1px solid rgba(227, 199, 124, .31); border-radius: 99px; padding: 5px 11px; color: #e9d8ab; background: rgba(11, 17, 25, .75); font-size: 10px; font-weight: 700; letter-spacing: 1.2px; max-width: calc(100% - 76px); }
+  .cd-state-text { overflow-wrap: anywhere; }
+  .cd-dot { width: 5px; height: 5px; background: #65dfba; border-radius: 50%; flex-shrink: 0; }
+  .cd-window[data-result="negative"] .cd-dot { background: #ff8d87; }
+  .cd-window[data-result="unknown"] .cd-dot { background: #a7b1bd; }
+  .cd-window[data-event="rollback"] .cd-state { color: #f6d595; border-color: rgba(229, 182, 92, .5); }
+  .cd-window[data-event="rollback"] .cd-dot { background: #efc372; }
+  .cd-name { margin: 0; font-size: 28px; line-height: 1.15; font-weight: 800; letter-spacing: -1px; overflow-wrap: anywhere; }
+  .cd-position { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; font-size: 11px; color: #bdc5ce; margin-top: 6px; }
+  .cd-number { color: #e8d5a6; font-weight: 700; white-space: nowrap; }
+  .cd-id { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 10px; overflow-wrap: anywhere; user-select: all; }
+
+  .cd-body { padding: 0 28px 22px; }
+  .cd-summary { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; padding: 23px 0 19px; border-bottom: 1px solid var(--line); }
+  .cd-summary > div { min-width: 0; }
+  .cd-label { margin: 0 0 4px; font-size: 10px; letter-spacing: 1.6px; font-weight: 600; color: var(--dim); text-transform: uppercase; }
+  .cd-net { margin: 0; display: flex; align-items: baseline; gap: 9px; flex-wrap: wrap; line-height: 1.15; }
+  .cd-amount { font-size: 34px; font-weight: 800; letter-spacing: -1.4px; color: var(--ink); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; min-width: 0; }
+  .cd-currency { font-size: 11px; font-weight: 600; color: var(--dim); letter-spacing: 1px; }
+  .cd-return { border-left: 1px solid var(--line); padding-left: 20px; min-width: 0; }
+  .cd-return strong { display: block; font-size: 28px; line-height: 1.15; font-weight: 700; letter-spacing: -.6px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+  .cd-amount.cd-wide { font-size: 26px; letter-spacing: -1px; }
+  .cd-return strong.cd-wide { font-size: 22px; }
+  .cd-amount.cd-wider { font-size: 22px; letter-spacing: -.6px; }
+  .cd-return strong.cd-wider { font-size: 18px; }
+  .cd-return span { display: block; color: var(--dim); font-size: 10px; margin-top: 2px; }
+
+  .cd-venues { display: grid; grid-template-columns: 1fr auto 1fr; gap: 16px; align-items: center; padding: 19px 0; border-bottom: 1px solid var(--line); }
+  .cd-venue { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; min-width: 0; }
+  .cd-venue:last-child { justify-content: flex-end; text-align: right; }
+  .cd-venue strong { font-weight: 750; font-size: 14px; overflow-wrap: anywhere; text-transform: uppercase; }
+  .cd-venue-note { flex-basis: 100%; color: var(--dim); font-size: 10px; }
+  .cd-side { font-size: 9px; font-weight: 800; letter-spacing: .8px; padding: 3px 6px; border-radius: 5px; }
+  .cd-long { color: var(--green); background: var(--green-tint); }
+  .cd-short { color: var(--red); background: var(--red-tint); }
+  .cd-bridge { color: var(--gold); display: flex; align-items: center; }
+  .cd-bridge svg { width: 17px; height: 17px; }
+
+  .cd-event { display: flex; gap: 11px; align-items: flex-start; padding: 14px 15px; border: 1px solid var(--gold-edge); background: var(--gold-soft); border-radius: 12px; margin-top: 18px; }
+  .cd-event-icon { color: var(--gold); flex-shrink: 0; display: flex; padding-top: 2px; }
+  .cd-event-icon svg { width: 17px; height: 17px; }
+  .cd-event h2 { margin: 0 0 3px; font-size: 12px; color: var(--gold); font-weight: 750; }
+  .cd-event p { margin: 0; font-size: 11px; color: var(--dim); line-height: 1.6; }
+
+  dt { font-size: 11px; color: var(--dim); font-weight: 400; margin: 0 0 5px; }
+  dd { margin: 0; font-weight: 650; font-size: 15px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+  .cd-unit { font-size: 10px; font-weight: 500; color: var(--dim); }
+  .cd-positive { color: var(--green); }
+  .cd-negative { color: var(--red); }
+  .cd-unknown { color: var(--dim); }
+  .cd-overview { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 19px 0 0; padding: 16px; background: var(--panel); border-radius: 12px; }
+
+  .cd-section-title { margin: 21px 0 12px; display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .cd-section-title h2 { font-size: 12px; letter-spacing: .2px; font-weight: 750; margin: 0; }
+  .cd-section-title span { font-size: 10px; color: var(--dim); }
+  .cd-execution { display: grid; grid-template-columns: 1fr 1fr; border-bottom: 1px solid var(--line); padding: 4px 0 20px; }
+  .cd-fill { min-width: 0; padding: 0 20px 0 0; }
+  .cd-fill:last-child { padding: 0 0 0 20px; border-left: 1px solid var(--line); }
+  .cd-fill h3 { font-size: 10px; letter-spacing: 1.3px; font-weight: 750; color: var(--gold); margin: 0 0 11px; text-transform: uppercase; }
+  .cd-comparison { display: grid; grid-template-columns: minmax(0, 1fr) 18px minmax(0, 1fr); gap: 7px; align-items: end; }
+  .cd-comparison dl { margin: 0; min-width: 0; }
+  .cd-comparison dt { font-size: 10px; }
+  .cd-comparison dd { font-size: 21px; letter-spacing: -.6px; white-space: nowrap; }
+  .cd-arrow { color: var(--dim); padding-bottom: 5px; display: flex; justify-content: center; }
+  .cd-arrow svg { width: 14px; height: 14px; }
+  .cd-delta { display: flex; gap: 5px; align-items: center; font-size: 10px; margin-top: 11px; padding-top: 10px; border-top: 1px solid var(--line); font-weight: 600; flex-wrap: wrap; }
+  .cd-delta svg { width: 12px; height: 12px; }
+  .cd-delta span:last-child { margin-left: auto; }
+
+  .cd-lifecycle { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 0; padding-bottom: 19px; border-bottom: 1px solid var(--line); }
+  .cd-lifecycle dd { font-size: 13px; font-weight: 600; }
+  .cd-date { display: block; color: var(--dim); font-size: 11px; font-weight: 400; margin-top: 2px; }
+  .cd-close { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 17px 0; }
+  .cd-close p { margin: 0; font-size: 13px; font-weight: 650; overflow-wrap: anywhere; }
+  .cd-close-label { font-size: 11px; color: var(--dim); margin-bottom: 4px; }
+  .cd-close-mark { width: 27px; height: 27px; border-radius: 50%; background: var(--green-tint); color: var(--green); display: grid; place-items: center; flex-shrink: 0; }
+  .cd-close-mark svg { width: 14px; height: 14px; }
+  .cd-window[data-result="negative"] .cd-close-mark { color: var(--red); background: var(--red-tint); }
+  .cd-window[data-result="unknown"] .cd-close-mark { color: var(--dim); background: var(--panel); }
+  .cd-window[data-event="rollback"] .cd-close-mark { color: var(--gold); background: var(--gold-tint); }
+  .cd-footer { display: flex; justify-content: space-between; gap: 12px; color: var(--dim); font-size: 9px; letter-spacing: .3px; border-top: 1px solid var(--line); padding-top: 11px; flex-wrap: wrap; }
+  .cd-footer span:last-child { color: var(--gold); }
+
+  @media (max-width: 560px) {
+    body { padding: 0 0 env(safe-area-inset-bottom); }
+    .cd-window { border: 0; border-radius: 0; box-shadow: none; }
+  }
+  @media (max-width: 520px) {
+    .cd-hero { padding: 22px 20px 21px; }
+    .cd-art { background-position: 59% 36%; }
+    .cd-art::after { background: linear-gradient(90deg, rgba(9, 16, 25, .95) 0%, rgba(9, 16, 25, .8) 32%, rgba(9, 16, 25, .23) 82%), linear-gradient(0deg, #0a1018 0%, transparent 50%); }
+    .cd-body { padding: 0 20px 19px; }
+    .cd-name { font-size: 25px; }
+    .cd-id { font-size: 9px; }
+    .cd-position { font-size: 10px; gap: 6px; }
+    .cd-summary { gap: 10px; padding-top: 20px; }
+    .cd-amount { font-size: 28px; }
+    .cd-return { padding-left: 13px; }
+    .cd-return strong { font-size: 23px; }
+    .cd-amount.cd-wide { font-size: 21px; letter-spacing: -.6px; }
+    .cd-return strong.cd-wide { font-size: 18px; }
+    .cd-amount.cd-wider { font-size: 17px; letter-spacing: -.3px; }
+    .cd-return strong.cd-wider { font-size: 15px; }
+    .cd-venues { gap: 8px; padding: 16px 0; }
+    .cd-venue { gap: 5px; }
+    .cd-venue strong { font-size: 12px; }
+    .cd-side { font-size: 8px; padding: 3px 5px; }
+    .cd-bridge svg { width: 14px; height: 14px; }
+    .cd-overview { grid-template-columns: 1fr 1fr; gap: 15px 12px; }
+    .cd-execution { grid-template-columns: 1fr; }
+    .cd-fill { padding: 0 0 16px; }
+    .cd-fill:last-child { padding: 16px 0 0; border-left: 0; border-top: 1px solid var(--line); }
+    .cd-comparison { grid-template-columns: minmax(0, 1fr) 22px minmax(0, 1fr); gap: 10px; }
+    .cd-comparison dd { font-size: 22px; }
+    .cd-comparison dl:last-child { text-align: right; }
+    .cd-delta { font-size: 11px; }
+    .cd-lifecycle { gap: 12px; }
+    .cd-section-title { margin-top: 20px; }
+  }
 </style>
 </head>
 <body>
 <main id="app"><p class="empty">Loading…</p></main>
 <script>
-(async () => {
-  const tg = window.Telegram?.WebApp;
-  // Inside Telegram the page follows the client's theme; elsewhere the system's.
-  try { tg?.ready(); tg?.expand(); if (tg?.initData) document.documentElement.dataset.theme = tg.colorScheme; } catch {}
-  const app = document.getElementById('app');
+// Closed position details for the carry Telegram notifier. The summary
+// travels in the direct link's startapp parameter, which Telegram hands to
+// the page as start_param (and as ?tgWebAppStartParam=); ?d= or #d= opens
+// the page outside Telegram. Format: base64url(deflate-raw(JSON)), version 1
+// (links sent before 2026-11-04) or version 2 (carry-web notify/share-link.mjs).
+// Nothing is fetched or stored; values are shown as the record states them.
+const CarryDetails = (() => {
   const esc = s => String(s ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch]);
+  const DASH = '\u2014', MINUS = '\u2212';
+  const ROLLBACKS = ['partial_entry_rollback', 'scale_rollback_failed'];
+  const icon = {
+    swap: '<svg viewBox="0 0 24 24"><path d="M8 3 4 7l4 4"/><path d="M4 7h16"/><path d="m16 21 4-4-4-4"/><path d="M20 17H4"/></svg>',
+    unlink: '<svg viewBox="0 0 24 24"><path d="M9 17H7A5 5 0 0 1 7 7h2"/><path d="M15 7h2a5 5 0 0 1 4 8"/><path d="M8 12h2"/><path d="m3 3 18 18"/></svg>',
+    rewind: '<svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>',
+    check: '<svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>',
+    minus: '<svg viewBox="0 0 24 24"><path d="M5 12h14"/></svg>',
+    right: '<svg viewBox="0 0 24 24"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>',
+    up: '<svg viewBox="0 0 24 24"><path d="M7 17 17 7"/><path d="M7 7h10v10"/></svg>',
+    down: '<svg viewBox="0 0 24 24"><path d="m7 7 10 10"/><path d="M17 7v10H7"/></svg>',
+  };
 
-  // The summary travels in the direct link's startapp parameter, which Telegram
-  // hands to the page as start_param (and as ?tgWebAppStartParam=). `d` is
-  // for opening the page outside Telegram. Format: base64url(deflate-raw(JSON)).
-  const params = new URLSearchParams(location.search + '&' + location.hash.replace(/^#/, ''));
-  const raw = tg?.initDataUnsafe?.start_param || params.get('tgWebAppStartParam') || params.get('d');
   async function decode(text) {
     const bytes = Uint8Array.from(atob(text.replace(/-/g, '+').replace(/_/g, '/')), ch => ch.charCodeAt(0));
     const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
     return JSON.parse(await new Response(stream).text());
   }
-  let d;
-  try { d = raw ? await decode(raw) : null; } catch (error) { app.innerHTML = `<p class="empty">Could not read the link: ${esc(error.message)}</p>`; return; }
-  if (!d) { app.innerHTML = '<p class="empty">Open this page from a carry notification.</p>'; return; }
 
-  const na = 'N/A';
-  const money = v => v == null ? na : `${Number(v).toLocaleString('en-US', { maximumFractionDigits: 4 })}`;
-  const pct = (v, digits = 2) => v == null ? na : `${(Number(v) * 100).toFixed(digits)}%`;
-  const color = v => v == null || Number(v) === 0 ? '' : Number(v) > 0 ? 'pos' : 'neg';
-  const time = s => s == null ? na : new Date(s * 1000).toLocaleString('en-GB', { timeZone: 'America/Los_Angeles', hour12: false }).replace(',', ',') + ' PT';
-  const clock = s => new Date(s * 1000).toLocaleTimeString('en-GB', { timeZone: 'America/Los_Angeles', hour12: false });
-  const held = (a, b) => { if (a == null || b == null) return na; const m = Math.max(1, Math.round((b - a) / 60)); const dd = Math.floor(m / 1440), h = Math.floor((m % 1440) / 60), r = m % 60; return [[dd, 'd'], [h, 'h'], [r, 'm']].filter(([v]) => v > 0).map(([v, u]) => v + u).join(' '); };
-  const base = v => v == null ? na : Number(v).toLocaleString('en-US');
-  const modeLabel = { live: 'LIVE', paper: 'PAPER', mixed: 'Mixed', simulation: 'Simulation' }[d.m] ?? d.m;
-  const reasonLabel = { partial_entry_rollback: 'ROLLBACK', entry_not_filled: 'NOT FILLED', hedge_mismatch: 'HEDGE MISMATCH', basis_target_reached: 'TARGET', planned_net_reached: 'NET', partial_reversion_reached: 'PARTIAL', holding_time_elapsed: 'TIMEOUT', adverse_funding_exit: 'FUNDING', max_holding_elapsed: 'MAX HOLD', funding_estimate_unavailable: 'NO FUNDING DATA', basis_regime_changed: 'REGIME CHANGED', future_net_profit_not_attractive: 'NOT ATTRACTIVE', simulation_margin_guard: 'Margin guard', simulation_margin_threshold_breached: 'Margin threshold', demo_liquidation_proximity: 'LIQUIDATION', instrument_margin_tier_changed: 'Margin tier changed', scale_rollback_failed: 'SCALE ROLLBACK', manual: 'MANUAL', external_closure: 'LIQUIDATION' };
-  const reason = code => !code ? na : reasonLabel[code] ?? (code.startsWith('close_asap') ? 'ASAP' : code.startsWith('external') ? 'LIQUIDATION' : code.replaceAll('_', ' '));
-  const modelLabel = m => !m ? na : /minimal_15m/.test(m) ? 'Minimal 15m' : /executable_reversion/.test(m) ? 'Exec reversion' : /intraday/.test(m) ? 'Intraday' : /adaptive/.test(m) ? 'Adaptive basis' : m === 'historical_basis_v1' ? 'Historical basis' : m;
-  const move = (entry, exit, side) => {
-    if (entry == null || exit == null || Number(entry) <= 0) return '';
-    const ratio = (Number(exit) - Number(entry)) / Number(entry) * 100;
-    const good = ratio === 0 ? '' : (ratio > 0) === (side === 'long') ? 'pos' : 'neg';
-    return `<span class="move ${good}">${ratio > 0 ? '▲ +' : ratio < 0 ? '▼ ' : ''}${ratio.toFixed(2)}%</span>`;
+  // Strict readers: anything malformed becomes unknown, never zero.
+  const n = v => typeof v === 'number' && Number.isFinite(v) ? v : null;
+  const t = v => typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : null;
+  const s = v => typeof v === 'string' && v ? v : null;
+  const lev = v => Number.isInteger(v) && v > 0 && v <= 200 ? v : null;
+
+  /** One display model for both link versions. */
+  function normalize(d) {
+    if (!d || typeof d !== 'object') throw new Error('Unrecognized link data');
+    const base = { id: s(d.id), symbol: s(d.s), mode: s(d.m), reason: s(d.cr), net: n(d.n), capital: n(d.cap), leverage: lev(d.lv), opened: t(d.o), closed: t(d.c) };
+    if (d.v === 1) {
+      // Version 1: sp = [entry decision midpoint gap, entry fill gap, exit fill
+      // gap, frozen target]. The target is not a close-time signal, so the exit
+      // has no reference. The record's opened_at stands for the opening time.
+      const L = Array.isArray(d.L) ? d.L : [], S = Array.isArray(d.S) ? d.S : [], sp = Array.isArray(d.sp) ? d.sp : [];
+      const paired = base.reason !== 'partial_entry_rollback';
+      const legV1 = l => typeof l[1] === 'string' && l[1] ? (typeof l[2] === 'string' && l[2] ? 'filled-exit' : 'filled') : 'no-price';
+      return { ...base, version: 1, paired, ret: paired ? n(d.r) : null, retDigits: 3, funding: n(d.f),
+        entered: paired ? base.opened : null, firstFill: null, long: s(L[0]), short: s(S[0]),
+        entrySignal: n(sp[0]), entryFill: paired ? n(sp[1]) : null, firstLot: false,
+        exitRef: null, exitKind: null, exitParts: null, exitFill: paired ? n(sp[2]) : null,
+        legs: paired ? null : [legV1(L), legV1(S)], scaled: Array.isArray(d.sc) ? d.sc.length : 0 };
+    }
+    if (d.v === 2) {
+      const g = Array.isArray(d.g) ? d.g : [];
+      // Only an explicit entry rollback means no hedged pair; a missing entry
+      // time on another close is just unknown.
+      const entered = t(d.e), paired = base.reason !== 'partial_entry_rollback';
+      const code = v => Number.isInteger(v) && v >= 0 && v <= 7 ? v : 0;
+      const legV2 = v => { const c = code(v), fill = c & 3, flat = c >= 4 && fill > 1; return fill === 0 ? null : (['', 'none', 'partial', 'full'][fill] + (flat ? '-flat' : '')); };
+      const kind = d.x === 's' ? 'signal' : d.x === 'p' ? 'plan' : null;
+      return { ...base, version: 2, paired, ret: paired ? n(d.r) : null, retDigits: 4, funding: n(d.f),
+        entered: paired ? entered : null, firstFill: paired ? null : t(d.u), long: s(d.L), short: s(d.S),
+        entrySignal: n(g[0]), entryFill: paired ? n(g[1]) : null, firstLot: d.k === 1,
+        exitRef: paired && kind ? n(g[2]) : null, exitKind: kind, exitParts: Number.isInteger(d.xp) && d.xp > 1 ? d.xp : null,
+        exitFill: paired ? n(g[3]) : null,
+        legs: paired ? null : Array.isArray(d.q) ? [legV2(d.q[0]), legV2(d.q[1])] : [null, null],
+        scaled: Number.isInteger(d.ns) && d.ns > 0 ? d.ns : 0 };
+    }
+    throw new Error('Unsupported link version');
+  }
+
+  const signed = (v, digits) => v == null ? DASH : (v > 0 ? '+' : v < 0 ? MINUS : '') + Math.abs(v).toFixed(digits);
+  const tone = v => v == null ? 'cd-unknown' : v > 0 ? 'cd-positive' : v < 0 ? 'cd-negative' : '';
+  const pct = (v, digits) => v == null ? DASH : (v < 0 ? MINUS : '') + Math.abs(v * 100).toFixed(digits) + '%';
+  const signedPct = (v, digits) => v == null ? DASH : (v > 0 ? '+' : v < 0 ? MINUS : '') + Math.abs(v * 100).toFixed(digits) + '%';
+  // Long figures step down a size before they would have to wrap.
+  const wide = (text, limit) => text.length > limit + 3 ? ' cd-wide cd-wider' : text.length > limit ? ' cd-wide' : '';
+  const money = v => v == null ? DASH : v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const duration = (from, to) => {
+    if (from == null || to == null || to < from) return DASH;
+    const total = Math.round(to - from), d = Math.floor(total / 86400), h = Math.floor(total % 86400 / 3600), m = Math.floor(total % 3600 / 60), sec = total % 60;
+    const parts = d ? [[d, 'd'], [h, 'h'], [m, 'm']] : h ? [[h, 'h'], [m, 'm'], [sec, 's']] : m ? [[m, 'm'], [sec, 's']] : [[sec, 's']];
+    return parts.filter(([v], i) => v > 0 || i === 0).map(([v, u]) => v + u).join(' ');
   };
-  const leg = (side, [venue, entry, exit, fees, funding, net]) => `<section class="leg"><div class="head"><span class="side ${side}">${side}</span><b>${esc(venue)}</b>${move(entry, exit, side)}</div><dl>
-    <div><dt>Entry</dt><dd>${esc(entry ?? na)}</dd></div><div><dt>Exit</dt><dd>${esc(exit ?? na)}</dd></div>
-    <div><dt>Fees</dt><dd>${money(fees)}${fees == null ? '' : ' USDT'}</dd></div><div><dt>Funding</dt><dd class="${color(funding)}">${money(funding)}${funding == null ? '' : ' USDT'}</dd></div>
-    <div><dt>Net</dt><dd><b class="${color(net)}">${money(net)}</b>${net == null ? '' : ' USDT'}</dd></div></dl></section>`;
-  const pair = (k, v, cls = '') => `<div><dt>${k}</dt><dd class="${cls}">${v}</dd></div>`;
-  const spreads = ['Signal', 'Entry', 'Exit', 'Target'].map((k, i) => `<div><div class="k">${k}</div><div class="v">${pct(d.sp?.[i])}</div></div>`).join('');
-  const scales = (d.sc ?? []).map(([at, rung, from, to, inc, heldSpread]) => `<tr><td>${clock(at)}</td><td>${rung ? `Rung ${rung}` : 'Manual'}</td><td class="num">${base(from)} → ${base(to)}</td><td class="num">${pct(inc)}${heldSpread == null ? '' : ` <small>vs ${pct(heldSpread)}</small>`}</td><td class="num">+${base(to - from)}</td></tr>`).join('');
-  app.innerHTML = `
-    <h1>${esc(modeLabel)} · ${esc(d.s)}</h1><div class="id">${esc(d.id)}</div>
-    <div class="hero">
-      <div><div class="k">Net P&amp;L</div><div class="v ${color(d.n)}">${money(d.n)}<small>USDT</small></div></div>
-      <div><div class="k">Net before funding</div><div class="v ${color(d.bf)}">${money(d.bf)}<small>USDT</small></div></div>
-      <div><div class="k">Net return, on notional</div><div class="v ${color(d.r)}">${pct(d.r, 4)}</div></div>
-      <div><div class="k">Return on margin</div><div class="v ${color(d.rm)}">${pct(d.rm, 4)}${d.lv ? `<small>${d.lv}x</small>` : ''}</div></div>
-    </div>
-    <h3>Legs</h3><div class="legs">${leg('long', d.L)}${leg('short', d.S)}</div>
-    <h3>Spread</h3><div class="spreads">${spreads}</div>
-    <h3>Trade</h3><dl>
-      ${pair('Opened', time(d.o))}${pair('Closed', time(d.c))}
-      ${pair('Held', held(d.o, d.c))}${pair('Close reason', esc(reason(d.cr)))}
-      ${pair('Model', esc(modelLabel(d.md)))}${pair('Execution mode', esc(modeLabel))}
-      ${pair('Capital', d.cap == null ? na : `${money(d.cap)} USDT`)}${pair('Base', base(d.b))}
-      ${pair('Funding', d.f == null ? na : `${money(d.f)} USDT`, color(d.f))}${pair('Status', esc((d.st || '').toUpperCase()))}
-    </dl>
-    ${scales ? `<h3>Scale-ins · ${d.sc.length}</h3><table><thead><tr><th>Time</th><th>Step</th><th class="num">Base</th><th class="num">Spread</th><th class="num">Added</th></tr></thead><tbody>${scales}</tbody></table>` : ''}
-    <p class="note">Prices and fees from the account fill records; net per venue is the engine's recorded leg component including that leg's fees and funding. Spread = (short − long) / mean(long, short): signal is venue midpoints at the decision, entry and exit are the fills, target is the frozen midpoint target. The price move beside a venue is exit against entry, coloured in the leg's direction. Snapshot packed at notification time.</p>`;
+  const ZONE = 'America/Los_Angeles';
+  const zoneName = at => new Intl.DateTimeFormat('en-US', { timeZone: ZONE, timeZoneName: 'short' }).formatToParts(new Date(at * 1000)).find(p => p.type === 'timeZoneName')?.value ?? 'PT';
+  const stamp = at => {
+    if (at == null) return '<dd class="cd-unknown">' + DASH + '</dd>';
+    const date = new Date(at * 1000);
+    const clock = date.toLocaleTimeString('en-GB', { timeZone: ZONE, hour12: false });
+    const day = date.toLocaleDateString('en-GB', { timeZone: ZONE, day: '2-digit', month: 'short', year: 'numeric' });
+    return '<dd><time datetime="' + esc(date.toISOString()) + '">' + esc(clock) + '<span class="cd-date">' + esc(day) + ' · ' + esc(zoneName(at)) + '</span></time></dd>';
+  };
+  const modeLabel = m => ({ live: 'LIVE', paper: 'PAPER', mixed: 'MIXED', simulation: 'SIMULATION' })[m] ?? (m ? m.toUpperCase() : '');
+  const reasons = {
+    basis_target_reached: 'Spread target reached', planned_net_reached: 'Planned net reached',
+    partial_reversion_reached: 'Partial reversion reached', holding_time_elapsed: 'Holding time elapsed',
+    max_holding_elapsed: 'Maximum holding time reached', adverse_funding_exit: 'Adverse funding ahead',
+    funding_estimate_unavailable: 'Funding estimate unavailable', basis_regime_changed: 'Spread regime changed',
+    future_net_profit_not_attractive: 'Remaining profit not attractive', simulation_margin_guard: 'Margin guard',
+    simulation_margin_threshold_breached: 'Margin threshold breached', demo_liquidation_proximity: 'Closed before liquidation',
+    instrument_margin_tier_changed: 'Margin tier changed', partial_entry_rollback: 'Entry hedge not completed',
+    scale_rollback_failed: 'Scale-in hedge failed', entry_not_filled: 'Entry not filled', hedge_mismatch: 'Hedge mismatch',
+    close_last: 'Close LAST filled', close_last_stop: 'Close LAST stop', close_last_residual: 'Close LAST residual',
+    manual: 'Closed manually', external_closure: 'Closed by the exchange',
+  };
+  const reasonText = code => {
+    if (!code) return DASH;
+    if (reasons[code]) return reasons[code];
+    if (code.startsWith('close_asap')) return 'Close ASAP triggered';
+    if (code.startsWith('external')) return 'Closed by the exchange';
+    const words = code.replaceAll('_', ' ');
+    return words[0].toUpperCase() + words.slice(1);
+  };
+  const pair = symbol => symbol ? symbol.split(':')[0].split('/').join(' / ') : DASH;
+  const number = id => { const m = /(\d{3,})$/.exec(id ?? ''); return m ? m[1].replace(/\B(?=(\d{3})+(?!\d))/g, '\u2009') : null; };
+
+  // Signed difference in percentage points; entry: a wider fill gap is
+  // better, exit: a narrower one. It includes market movement between the
+  // reference and the fills, so it reads "vs signal/plan".
+  function comparison(title, refLabel, ref, fillLabel, fill, widerIsBetter, missing) {
+    const delta = ref != null && fill != null ? Math.round((fill - ref) * 1e5) / 1e3 : null;
+    const good = delta == null || delta === 0 ? null : (delta > 0) === widerIsBetter;
+    const cls = delta == null ? 'cd-unknown' : good == null ? '' : good ? 'cd-positive' : 'cd-negative';
+    const basis = refLabel.split(' ')[0].toLowerCase();
+    const text = delta == null ? missing : delta === 0 ? 'Same as ' + basis : Math.abs(delta).toFixed(3) + ' pp ' + (good ? 'better' : 'worse');
+    return '<section class="cd-fill" aria-label="' + esc(title + ': ' + text) + '"><h3>' + esc(title) + '</h3>'
+      + '<div class="cd-comparison"><dl><dt>' + esc(refLabel) + '</dt><dd class="' + (ref == null ? 'cd-unknown' : '') + '">' + pct(ref, 3) + '</dd></dl>'
+      + '<div class="cd-arrow">' + icon.right + '</div>'
+      + '<dl><dt>' + esc(fillLabel) + '</dt><dd class="' + (fill == null ? 'cd-unknown' : cls) + '">' + pct(fill, 3) + '</dd></dl></div>'
+      + '<div class="cd-delta ' + cls + '">' + (delta == null || good == null ? icon.minus : good ? icon.up : icon.down)
+      + '<span>' + esc(text) + '</span><span>' + (delta == null ? 'Unavailable' : 'vs ' + esc(basis)) + '</span></div></section>';
+  }
+
+  const legNote = state => ({ none: 'Not filled', partial: 'Partly filled', full: 'Filled', 'partial-flat': 'Partly filled · closed back', 'full-flat': 'Filled · closed back', filled: 'Fill recorded', 'filled-exit': 'Filled · closed back', 'no-price': 'No fill price recorded' })[state] ?? '';
+
+  function render(d) {
+    const rollback = ROLLBACKS.includes(d.reason);
+    // Art and marks follow the close reason for rollbacks and the recorded
+    // Net otherwise; an unknown Net implies neither profit nor loss.
+    const result = d.net == null ? 'unknown' : d.net < 0 ? 'negative' : 'positive';
+    const event = rollback ? 'rollback' : { unknown: 'unknown', negative: 'loss', positive: 'profit' }[result];
+    const status = (d.reason === 'scale_rollback_failed' ? 'SCALE ROLLBACK' : d.reason === 'partial_entry_rollback' ? 'ROLLBACK' : 'CLOSED') + (d.mode ? ' · ' + modeLabel(d.mode) : '');
+    const no = number(d.id);
+    const unpaired = !d.paired;
+
+    // Short note; the recorded Net sits above and each leg's fill state beside its venue.
+    const callout = !rollback ? '' : '<div class="cd-event" role="note"><div class="cd-event-icon">' + icon.rewind + '</div><div>'
+      + (d.reason === 'partial_entry_rollback'
+        ? '<h2>Entry rolled back</h2><p>The entry did not form a hedged pair.</p>'
+        : '<h2>Scale-in rolled back</h2><p>A scale-in could not be hedged, so the whole position was closed.</p>')
+      + '</div></div>';
+
+    const venue = (side, name, state, right) => {
+      const tag = '<span class="cd-side cd-' + side + '">' + side.toUpperCase() + '</span>', label = '<strong>' + esc(name ?? DASH) + '</strong>';
+      const note = state ? '<span class="cd-venue-note">' + esc(legNote(state)) + '</span>' : '';
+      return '<div class="cd-venue">' + (right ? label + tag : tag + label) + note + '</div>';
+    };
+    const legs = d.legs ?? [null, null];
+
+    const holdingLabel = unpaired ? 'Time to unwind' : 'Holding time';
+    const holding = unpaired ? duration(d.firstFill, d.closed) : duration(d.entered, d.closed);
+    const exitRefLabel = d.exitKind === 'plan' ? 'Plan' + (d.exitParts ? ' · ' + d.exitParts + ' parts' : '') : 'Signal';
+    const zone = d.closed != null ? zoneName(d.closed) : 'PT';
+    const netText = signed(d.net, 4), retText = signedPct(d.ret, d.retDigits);
+    // The first timeline stamp: the hedged entry, or the attempt when no pair
+    // formed or the record has no entry time.
+    const start = unpaired ? ['Entry attempt', d.opened] : d.entered != null ? ['Opened', d.entered] : ['Entry started', d.opened];
+
+    return '<article class="cd-window" data-event="' + event + '" data-result="' + result + '" aria-label="' + esc(rollback ? 'Rolled back position details' : result === 'negative' ? 'Closed position with a loss' : 'Closed position details') + '">'
+      + '<header class="cd-hero"><div class="cd-art" aria-hidden="true"></div>'
+      + '<div class="cd-brandline"><div class="cd-brand">Carry</div><div class="cd-state"><span class="cd-dot"></span><span class="cd-state-text">' + esc(status) + '</span></div></div>'
+      + '<h1 class="cd-name">' + esc(pair(d.symbol)) + '</h1>'
+      + '<div class="cd-position">' + (no ? '<span class="cd-number">#' + esc(no) + '</span><span aria-hidden="true">·</span>' : '') + '<span class="cd-id">' + esc(d.id ?? DASH) + '</span></div></header>'
+      + '<div class="cd-body">'
+      + '<div class="cd-summary"><div><div class="cd-label">Net result</div><p class="cd-net"><strong class="cd-amount' + (d.net != null && d.net < 0 ? ' cd-negative' : d.net == null ? ' cd-unknown' : '') + wide(netText, 8) + '">' + netText + '</strong><span class="cd-currency">USDT</span></p></div>'
+      + '<div class="cd-return"><div class="cd-label">Net return</div><strong class="' + tone(d.ret) + wide(retText, 8) + '">' + retText + '</strong><span>' + (d.ret != null ? 'on notional' : unpaired ? 'No paired position' : 'Not recorded') + '</span></div></div>'
+      + '<div class="cd-venues" aria-label="Exchanges and position directions">' + venue('long', d.long, legs[0], false)
+      + '<div class="cd-bridge" aria-hidden="true">' + (unpaired ? icon.unlink : icon.swap) + '</div>' + venue('short', d.short, legs[1], true) + '</div>'
+      + callout
+      + '<dl class="cd-overview">'
+      + '<div><dt>Capital · planned</dt><dd class="' + (d.capital == null ? 'cd-unknown' : '') + '">' + money(d.capital) + (d.capital == null ? '' : ' <span class="cd-unit">USDT</span>') + '</dd></div>'
+      + '<div><dt>' + (unpaired ? 'Leverage · planned' : 'Leverage') + '</dt><dd class="' + (d.leverage == null ? 'cd-unknown' : '') + '">' + (d.leverage == null ? DASH : d.leverage + '×') + '</dd></div>'
+      + '<div><dt>' + holdingLabel + '</dt><dd class="' + (holding === DASH ? 'cd-unknown' : '') + '">' + esc(holding) + '</dd></div>'
+      + '<div><dt>Funding · actual</dt><dd class="' + tone(d.funding) + '">' + signed(d.funding, 4) + (d.funding == null ? '' : ' <span class="cd-unit">USDT</span>') + '</dd></div>'
+      + '</dl>'
+      + '<div class="cd-section-title"><h2>Spread execution</h2><span>' + (d.exitKind === 'plan' ? 'Signal or plan' : 'Signal') + ' → actual fill</span></div>'
+      + '<div class="cd-execution">'
+      + comparison('Entry', 'Signal', d.entrySignal, d.firstLot ? 'Actual · first lot' : 'Actual', d.entryFill, true, unpaired ? 'No paired entry' : 'Not recorded')
+      + comparison('Exit', exitRefLabel, d.exitRef, 'Actual', d.exitFill, false, unpaired ? 'No paired exit' : d.exitFill != null ? 'No recorded ' + exitRefLabel.split(' ')[0].toLowerCase() : 'Not recorded')
+      + '</div>'
+      + '<div class="cd-section-title"><h2>Position timeline</h2><span>Pacific time</span></div>'
+      + '<dl class="cd-lifecycle"><div><dt>' + start[0] + '</dt>' + stamp(start[1]) + '</div><div><dt>Closed</dt>' + stamp(d.closed) + '</div></dl>'
+      + '<div class="cd-close"><div><div class="cd-close-label">Close reason</div><p>' + esc(reasonText(d.reason)) + '</p></div><div class="cd-close-mark" aria-hidden="true">' + (rollback ? icon.rewind : result === 'positive' ? icon.check : icon.minus) + '</div></div>'
+      + '<div class="cd-footer"><span>' + (d.funding != null ? 'Net includes recorded funding' : 'Funding not fully recorded') + '</span><span>Snapshot at notification · ' + esc(zone) + '</span></div>'
+      + '</div></article>';
+  }
+
+  return { decode, normalize, render, esc };
+})();
+
+(async () => {
+  const tg = window.Telegram?.WebApp;
+  // Inside Telegram the page follows the client's theme; elsewhere the system's.
+  try { tg?.ready(); tg?.expand(); if (tg?.initData) document.documentElement.dataset.theme = tg.colorScheme; } catch {}
+  const app = document.getElementById('app');
+  const params = new URLSearchParams(location.search + '&' + location.hash.replace(/^#/, ''));
+  const raw = tg?.initDataUnsafe?.start_param || params.get('tgWebAppStartParam') || params.get('d');
+  if (!raw) { app.innerHTML = '<p class="empty">Open this page from a carry notification.</p>'; return; }
+  try {
+    app.innerHTML = CarryDetails.render(CarryDetails.normalize(await CarryDetails.decode(raw)));
+  } catch (error) {
+    app.innerHTML = '<p class="empty">Could not read the link: ' + CarryDetails.esc(error.message) + '</p>';
+  }
 })();
 </script>
 </body>
