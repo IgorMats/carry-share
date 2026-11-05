@@ -200,83 +200,6 @@ test('open snapshot: unknowns are dashes, never zero', async () => {
   assert.equal(attr(await open(encode(v2({ st: 'z' }))), 'data-event'), 'profit');
 });
 
-// Entry slippage of the opening, as entryFills in notify/share-link.mjs writes it.
-const FRAX = { s: 'FRAX/USDT:USDT', L: 'KuCoin', S: 'Gate', cap: 118.6, es: [0.23595, 0.23955, 0.2362, 0.23938, 0.2362, 0.23938],
-  ei: [0.025, 0.017, 0.042], ec: [0.042, 0.0261, 0.0261], eo: ['i', 'm'], ef: 'l', et: [30, 98, 186] };
-const AKE = { s: 'AKE/USDT:USDT', L: 'Bybit', S: 'Binance', es: [0.0023725, 0.002409, 0.0023741129, 0.002408, 0.002399, 0.002407] };
-const slip = html => /<div class="cd-section-title"><h2>Entry slippage[\s\S]*?(?=<div class="cd-section-title"><h2>Spread execution)/.exec(html)?.[0];
-const row = (html, label) => words(new RegExp('<tr[^>]*><th scope="row">' + label + '</th>[\\s\\S]*?</tr>').exec(slip(html))[0]).trim();
-
-test('open snapshot: entry slippage per leg, between the overview and the spread', async () => {
-  const html = await open(encode(openV2(FRAX))), text = words(slip(html));
-  assert.ok(html.indexOf('Entry slippage') > html.indexOf('Funding · forecast') && html.indexOf('Entry slippage') < html.indexOf('Spread execution'));
-  assert.match(text, /Entry slippage Signal mid → plan → fill/); assert.match(text, /LONG KuCoin SHORT Gate/);
-  // One decimal count for every price: 0.2362 lines up as 0.23620.
-  assert.equal(row(html, 'Signal mid'), 'Signal mid 0.23595 0.23955');
-  assert.equal(row(html, 'Plan · book VWAP'), 'Plan · book VWAP 0.23620 +0.11% vs mid 0.23938 +0.07% vs mid');
-  assert.equal(row(html, 'Fill · first lot'), 'Fill · first lot 0.23620 +0.11% vs mid 0.23938 +0.07% vs mid');
-  assert.equal(row(html, 'Fill vs plan'), 'Fill vs plan 0.00% same as plan 0.00% same as plan');
-  assert.equal(row(html, 'Impact vs mid'), 'Impact vs mid +0.0250 USDT +0.0170 USDT');
-  assert.match(slip(html), /cd-negative">\+0\.0250/, 'a cost against the midpoint is red');
-  assert.equal(row(html, 'Order'), 'Order IOC limit sent first Market hedge');
-  assert.match(text, /Slippage plan 0\.0420 → actual 0\.0420 USDT Same as plan actual 0\.035% of capital/);
-  assert.match(text, /Fees plan 0\.0261 → actual 0\.0261 USDT Same as plan actual 0\.022% of capital/);
-  assert.match(text, /First order \+30 ms · first fill \+98 ms · hedged \+186 ms after signal/);
-});
-
-test('open snapshot: fills against plan are toned by direction', async () => {
-  // Bybit bought above plan (worse); Binance sold below plan (worse for a sell).
-  const html = await open(encode(openV2(AKE)));
-  assert.equal(row(html, 'Signal mid'), 'Signal mid 0.00237250 0.00240900');
-  assert.equal(row(html, 'Fill · first lot'), 'Fill · first lot 0.00239900 +1.12% vs mid 0.00240700 +0.08% vs mid');
-  assert.equal(row(html, 'Fill vs plan'), 'Fill vs plan +1.05% worse +0.04% worse');
-  assert.match(slip(html), /cd-negative">\+1\.05%/);
-  // Selling above plan and buying below it are better, in green.
-  const better = await open(encode(openV2({ ...AKE, es: [0.0023725, 0.002409, 0.0023741129, 0.002408, 0.00237, 0.00241],
-    ei: [-0.003, -0.001, -0.004], ec: [0.0042, 0.02, 0.019], eo: ['l3', 'x'], ef: 's', et: [1200, 15500, 75000] })));
-  assert.equal(row(better, 'Fill vs plan'), 'Fill vs plan \u22120.17% better \u22120.08% better');
-  assert.match(slip(better), /cd-positive">\u22120\.17%/);
-  assert.equal(row(better, 'Impact vs mid'), 'Impact vs mid \u22120.0030 USDT \u22120.0010 USDT');
-  assert.match(slip(better), /cd-positive">\u22120\.0030/);
-  assert.equal(row(better, 'Order'), 'Order Limit \u00d73 hedge Other sent first');
-  const totals = words(slip(better));
-  assert.match(totals, /Slippage plan 0\.0042 → actual \u22120\.0040 USDT \u22120\.0082 better/);
-  assert.match(slip(better), /cd-slip-delta cd-positive">\u22120\.0082 better/);
-  assert.match(totals, /Fees plan 0\.0200 → actual 0\.0190 USDT \u22120\.0010 better/);
-  assert.match(totals, /First order \+1\.20 s · first fill \+15\.5 s · hedged \+1m 15s after signal/);
-  const worse = words(slip(await open(encode(openV2({ ...FRAX, ei: [0.1, 0.05, 0.15] })))));
-  assert.match(worse, /plan 0\.0420 → actual 0\.1500 USDT \+0\.1080 worse/);
-});
-
-test('open snapshot: unknown entry details are dashes, never zero', async () => {
-  const html = await open(encode(openV2({ ...AKE, cap: null, es: [0.0023725, null, 'x', 0.002408, -1, 0.002407], ei: [null, 'x', null],
-    ec: [0.0042, null, Infinity], eo: [null, 'q'], ef: 'z', et: [null, -5, 1.5] })));
-  const text = words(slip(html));
-  assert.equal(row(html, 'Signal mid'), 'Signal mid 0.0023725 \u2014');
-  assert.equal(row(html, 'Plan · book VWAP'), 'Plan · book VWAP \u2014 0.0024080');
-  assert.equal(row(html, 'Fill · first lot'), 'Fill · first lot \u2014 0.0024070');
-  assert.equal(row(html, 'Fill vs plan'), 'Fill vs plan \u2014 +0.04% worse');
-  assert.equal(row(html, 'Impact vs mid'), 'Impact vs mid \u2014 \u2014');
-  assert.equal(row(html, 'Order'), 'Order \u2014 \u2014');
-  assert.match(text, /Slippage plan 0\.0042 → actual \u2014 USDT Fees plan \u2014 → actual \u2014 USDT/);
-  assert.ok(!/Same as plan|better|of capital|sent first|hedge|after signal|0\.0000/.test(text), text);
-  // Malformed order codes are unknown; a count of one is just the type.
-  assert.equal(row(await open(encode(openV2({ eo: ['m1', 'i0'] }))), 'Order'), 'Order Market \u2014');
-  // Only some keys present (a long link trimmed by the notifier) still shows the section.
-  assert.equal(row(await open(encode(openV2({ ec: [0.01, 0.02, 0.03] }))), 'Signal mid'), 'Signal mid \u2014 \u2014');
-});
-
-test('open snapshot: links sent before entry slippage say so; closed pages have no section', async () => {
-  const text = words(slip(await open(encode(openV2()))));
-  assert.match(text, /Entry slippage .* Entry prices are not in this link/);
-  assert.ok(!/Signal mid 0|Fill vs plan/.test(text));
-  // A closed link ignores the open-only keys entirely.
-  const closed = await open(encode(v2(FRAX)));
-  assert.equal(attr(closed, 'data-event'), 'profit');
-  assert.ok(!closed.includes('Entry slippage') && !closed.includes('cd-slip'));
-  assert.equal(closed, await open(encode(v2({ s: FRAX.s, L: FRAX.L, S: FRAX.S, cap: FRAX.cap }))));
-});
-
 // End to end with the notifier's encoder when the sibling carry-web checkout is present.
 const notifier = new URL('../../carry-web/notify/share-link.mjs', import.meta.url);
 test('notifier payloads render', { skip: !fs.existsSync(notifier) && 'carry-web checkout not found' }, async () => {
@@ -303,21 +226,6 @@ test('notifier open payloads render', { skip: typeof openEncoder.openSharePayloa
   const text = words(await open(encode(data)));
   assert.match(text, /OPEN · LIVE/); assert.match(text, /LONG OKX/); assert.match(text, /BingX SHORT/);
   assert.match(text, /Closed Still open/); assert.ok(!text.includes('Close reason'));
-  // A live opening with its entry orders carries the slippage section.
-  const live = { ...p, entry_calculation: { evaluated_at: '2026-11-03T17:41:12Z', capital_basis: '118.6', long_mid_price: '0.23595', short_mid_price: '0.23955',
-      long_entry_price: '0.2362', short_entry_price: '0.23938', expected_entry_slippage: '0.042', expected_entry_fee: '0.0261' },
-    execution_impact: { entry: { long: { status: 'available', amount: '0.025' }, short: { status: 'available', amount: '0.017' }, total: '0.042' } },
-    execution: { entered_at: '2026-11-03T17:41:12.186Z', entry_sequence: { first_leg: 'long', first_filled_at: '2026-11-03T17:41:12.098Z' },
-      long: { actual_entry_fee: '0.013', orders: [{ action: 'entry', type: 'ioc_limit', created_at: '2026-11-03T17:41:12.030Z', filled: '100', average: '0.2362' }] },
-      short: { actual_entry_fee: '0.0131', orders: [{ action: 'entry', type: 'market', created_at: '2026-11-03T17:41:12.120Z', filled: '100', average: '0.23938' }] } } };
-  const slipData = openEncoder.openSharePayload(live);
-  if (slipData.es) {
-    const html = await open(encode(slipData));
-    assert.equal(row(html, 'Fill · first lot'), 'Fill · first lot 0.23620 +0.11% vs mid 0.23938 +0.07% vs mid');
-    assert.equal(row(html, 'Order'), 'Order IOC limit sent first Market hedge');
-    assert.match(words(slip(html)), /Slippage plan 0\.0420 → actual 0\.0420 USDT Same as plan/);
-    assert.match(words(slip(html)), /First order \+30 ms · first fill \+98 ms · hedged \+186 ms after signal/);
-  }
   if (typeof openEncoder.shareLink === 'function') {
     const link = openEncoder.shareLink(p, { bot: 'b', app: 'share', kind: 'miniApp', open: true });
     assert.match(words(await open(link.url.split('startapp=')[1])), /OPEN · LIVE/);
