@@ -141,6 +141,65 @@ test('malformed or unsupported data is refused or reduced to unknown', async () 
   assert.match(text, /Net result \u2014/); assert.match(text, /Capital · planned \u2014/); assert.match(text, /Leverage \u2014/);
 });
 
+// An open snapshot as notify/share-link.mjs writes it for the opening card.
+const openV2 = extra => ({ v: 2, st: 'o', id: 'exec-auto-1805522', s: 'BTC/USDT:USDT', m: 'live', cap: 500, lv: 3,
+  o: 1793727672, e: 1793727674, L: 'Binance', S: 'Bybit', n: 2.85, r: 0.0057, f: 0.31, h: 1.5,
+  g: [0.00842, 0.00816, 0.0018, null], x: 't', ...extra });
+
+test('open snapshot: forecasts, frozen target, still open', async () => {
+  const html = await open(encode(openV2())), text = words(html);
+  assert.equal(attr(html, 'data-event'), 'open'); assert.equal(attr(html, 'data-result'), 'positive');
+  assert.match(text, /OPEN · LIVE/); assert.match(text, /BTC \/ USDT/); assert.match(html, /#1\u2009805\u2009522/);
+  assert.match(text, /Expected net \+2\.8500 USDT Forecast · excl\. funding/);
+  assert.match(text, /Expected return \+0\.5700% on notional/); assert.match(html, /cd-positive">\+0\.5700%/);
+  assert.match(text, /Capital · planned 500\.00 USDT/); assert.match(text, /Leverage 3×/);
+  assert.match(text, /Holding · forecast 1h 30m/); assert.match(text, /Funding · forecast \+0\.3100 USDT/);
+  assert.match(text, /Signal or target → actual fill/);
+  assert.match(text, /Entry Signal 0\.842% Actual 0\.816% .*0\.026 pp worse vs signal/);
+  assert.match(text, /Exit Target 0\.180% Actual \u2014 .*Position still open Pending/);
+  const exit = /<section class="cd-fill" aria-label="Exit[\s\S]*?<\/section>/.exec(html)[0];
+  assert.ok(!/better|worse|cd-positive|cd-negative|vs /.test(words(exit) + exit), 'the open exit is neutral');
+  assert.match(text, /Opened \d\d:\d\d:\d\d \d\d \w{3} 20\d\d · P[SD]T/); assert.match(text, /Closed Still open/);
+  assert.match(text, /Status Open at notification/);
+  assert.match(text, /Forecast frozen at entry · excludes later scale-ins/); assert.match(text, /Snapshot at opening · P[SD]T/);
+  for (const absent of ['Close reason', 'rolled back', 'Net result', 'Net return', 'Funding · actual', 'Holding time', 'Plan', 'Exit Signal', 'Net includes'])
+    assert.ok(!text.includes(absent), absent);
+});
+
+test('open snapshot: forecast tones, return basis, short holding', async () => {
+  const loss = await open(encode(openV2({ n: -1.2, r: -0.0024, f: -0.05, rb: 'm', h: 0.25 }))), text = words(loss);
+  assert.equal(attr(loss, 'data-event'), 'open'); assert.equal(attr(loss, 'data-result'), 'negative');
+  assert.match(loss, /cd-amount cd-negative">\u22121\.2000/); assert.match(loss, /cd-negative">\u22120\.2400%/);
+  assert.match(loss, /cd-negative">\u22120\.0500/);
+  assert.match(text, /\u22120\.2400% on margin/); assert.ok(!text.includes('on notional'));
+  assert.match(text, /Holding · forecast 15m/);
+  assert.match(words(await open(encode(openV2({ h: 1 })))), /Holding · forecast 1h /);
+  assert.match(words(await open(encode(openV2({ h: 26.5 })))), /Holding · forecast 1d 2h 30m/);
+});
+
+test('open snapshot: unknowns are dashes, never zero', async () => {
+  const html = await open(encode(openV2({ n: null, r: null, f: null, h: null, cap: null, lv: null, e: null, g: [null, null, null, null], x: undefined })));
+  const text = words(html);
+  assert.equal(attr(html, 'data-event'), 'open'); assert.equal(attr(html, 'data-result'), 'unknown');
+  assert.match(text, /Expected net \u2014 USDT Not forecast/); assert.match(text, /Expected return \u2014 Not forecast/);
+  assert.match(text, /Capital · planned \u2014/); assert.match(text, /Leverage \u2014/);
+  assert.match(text, /Holding · forecast \u2014/); assert.match(text, /Funding · forecast \u2014/);
+  assert.match(text, /Entry Signal \u2014 Actual \u2014 .*Not recorded/); assert.match(text, /Exit Target \u2014 Actual \u2014 .*Position still open/);
+  assert.match(text, /Entry started \d\d:\d\d/, 'falls back to the entry start when the hedged entry time is missing');
+  assert.ok(!/0\.0000|0\.000%/.test(text));
+  // Without x:'t' the third gap is not a target and is not shown.
+  const noTarget = words(await open(encode(openV2({ x: undefined }))));
+  assert.match(noTarget, /Exit Target \u2014/); assert.ok(!noTarget.includes('0.180%'));
+  // Malformed values become unknown; a stray close reason never surfaces.
+  const bad = words(await open(encode(openV2({ n: '5', h: -2, f: 'x', r: Infinity, rb: 'x', cr: 'partial_entry_rollback', k: 1 }))));
+  assert.match(bad, /Expected net \u2014/); assert.match(bad, /Holding · forecast \u2014/); assert.match(bad, /Funding · forecast \u2014/);
+  assert.match(bad, /Actual · first lot/); assert.ok(!/rolled back|Entry hedge not completed/.test(bad));
+  const huge = words(await open(encode(openV2({ h: 1e308 }))));
+  assert.match(huge, /Holding · forecast —/); assert.ok(!huge.includes('Infinity'));
+  // Any other st value reads as a closed link.
+  assert.equal(attr(await open(encode(v2({ st: 'z' }))), 'data-event'), 'profit');
+});
+
 // End to end with the notifier's encoder when the sibling carry-web checkout is present.
 const notifier = new URL('../../carry-web/notify/share-link.mjs', import.meta.url);
 test('notifier payloads render', { skip: !fs.existsSync(notifier) && 'carry-web checkout not found' }, async () => {
@@ -154,4 +213,21 @@ test('notifier payloads render', { skip: !fs.existsSync(notifier) && 'carry-web 
   const text = words(await open(link.url.split('startapp=')[1]));
   assert.match(text, /LONG OKX Filled · closed back/); assert.match(text, /BingX SHORT Not filled/);
   assert.match(text, /\u22120\.3100 USDT/); assert.match(text, /Time to unwind 17s/); assert.match(text, /Signal 0\.333%/);
+});
+
+// The open encoder round trip, once the notifier exports openSharePayload.
+const openEncoder = fs.existsSync(notifier) ? await import(notifier) : {};
+test('notifier open payloads render', { skip: typeof openEncoder.openSharePayload !== 'function' && 'notifier has no openSharePayload yet' }, async () => {
+  const p = { id: 'exec-auto-78', symbol: 'ETH/USDT:USDT', execution_mode: 'live', capital_basis: '500', margin: { leverage: 5 },
+    opened_at: '2026-11-03T17:41:12Z', long: { exchange: 'OKX' }, short: { exchange: 'BingX' },
+    execution: { entered_at: '2026-11-03T17:41:14Z' } };
+  const data = openEncoder.openSharePayload(p);
+  assert.equal(data.st, 'o');
+  const text = words(await open(encode(data)));
+  assert.match(text, /OPEN · LIVE/); assert.match(text, /LONG OKX/); assert.match(text, /BingX SHORT/);
+  assert.match(text, /Closed Still open/); assert.ok(!text.includes('Close reason'));
+  if (typeof openEncoder.shareLink === 'function') {
+    const link = openEncoder.shareLink(p, { bot: 'b', app: 'share', kind: 'miniApp', open: true });
+    assert.match(words(await open(link.url.split('startapp=')[1])), /OPEN · LIVE/);
+  }
 });

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
 <title>carry · position</title>
-<meta name="description" content="Closed position summary opened from the carry Telegram notifier. All data comes packed in the link; nothing is fetched or stored.">
+<meta name="description" content="Position summary opened from the carry Telegram notifier: the closed position, or an open position snapshot sent with the opening card. All data comes packed in the link; nothing is fetched or stored.">
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <style>
   @font-face { font-family: CarryManrope; src: url('assets/manrope.woff2') format('woff2'); font-weight: 200 800; font-display: swap; }
@@ -46,6 +46,14 @@
   .cd-window[data-event="loss"] .cd-art { background-image: url('assets/loss.jpg'); }
   .cd-window[data-event="rollback"] .cd-art { background-image: url('assets/rollback.jpg'); }
   .cd-window[data-event="unknown"] .cd-art { background-image: none; }
+  /* Open snapshot: light harbour art with dark ink, the same in both themes. */
+  .cd-window[data-event="open"] .cd-hero { background: #f6f1e3; color: #152333; }
+  .cd-window[data-event="open"] .cd-art { background-color: #f6f1e3; background-image: url('assets/open.jpg'); }
+  .cd-window[data-event="open"] .cd-art::after { background: linear-gradient(90deg, rgba(249, 245, 234, .97) 0%, rgba(249, 245, 234, .88) 27%, rgba(249, 245, 234, .3) 58%, rgba(249, 245, 234, 0) 83%), linear-gradient(0deg, #f9f5ea 0%, rgba(249, 245, 234, .35) 14%, transparent 45%); }
+  .cd-window[data-event="open"] .cd-brand { color: #86621b; }
+  .cd-window[data-event="open"] .cd-state { color: #5c4512; border-color: rgba(134, 98, 27, .38); background: rgba(255, 252, 243, .86); }
+  .cd-window[data-event="open"] .cd-position { color: #4d5b6a; }
+  .cd-window[data-event="open"] .cd-number { color: #86621b; }
   .cd-brandline { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
   .cd-brand { font: 400 29px/1 CarryScript, cursive; color: #f3d78c; transform: rotate(-5deg); }
   .cd-state { display: flex; align-items: center; gap: 8px; border: 1px solid rgba(227, 199, 124, .31); border-radius: 99px; padding: 5px 11px; color: #e9d8ab; background: rgba(11, 17, 25, .75); font-size: 10px; font-weight: 700; letter-spacing: 1.2px; max-width: calc(100% - 76px); }
@@ -55,6 +63,9 @@
   .cd-window[data-result="unknown"] .cd-dot { background: #a7b1bd; }
   .cd-window[data-event="rollback"] .cd-state { color: #f6d595; border-color: rgba(229, 182, 92, .5); }
   .cd-window[data-event="rollback"] .cd-dot { background: #efc372; }
+  .cd-window[data-event="open"] .cd-dot { background: #0b9a72; }
+  .cd-window[data-event="open"][data-result="negative"] .cd-dot { background: #c9474d; }
+  .cd-window[data-event="open"][data-result="unknown"] .cd-dot { background: #8995a2; }
   .cd-name { margin: 0; font-size: 28px; line-height: 1.15; font-weight: 800; letter-spacing: -1px; overflow-wrap: anywhere; }
   .cd-position { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; font-size: 11px; color: #bdc5ce; margin-top: 6px; }
   .cd-number { color: #e8d5a6; font-weight: 700; white-space: nowrap; }
@@ -74,6 +85,7 @@
   .cd-amount.cd-wider { font-size: 22px; letter-spacing: -.6px; }
   .cd-return strong.cd-wider { font-size: 18px; }
   .cd-return span { display: block; color: var(--dim); font-size: 10px; margin-top: 2px; }
+  .cd-note { display: block; color: var(--dim); font-size: 10px; margin-top: 2px; }
 
   .cd-venues { display: grid; grid-template-columns: 1fr auto 1fr; gap: 16px; align-items: center; padding: 19px 0; border-bottom: 1px solid var(--line); }
   .cd-venue { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; min-width: 0; }
@@ -128,6 +140,7 @@
   .cd-window[data-result="negative"] .cd-close-mark { color: var(--red); background: var(--red-tint); }
   .cd-window[data-result="unknown"] .cd-close-mark { color: var(--dim); background: var(--panel); }
   .cd-window[data-event="rollback"] .cd-close-mark { color: var(--gold); background: var(--gold-tint); }
+  .cd-window[data-event="open"] .cd-close-mark { color: var(--gold); background: var(--gold-tint); }
   .cd-footer { display: flex; justify-content: space-between; gap: 12px; color: var(--dim); font-size: 9px; letter-spacing: .3px; border-top: 1px solid var(--line); padding-top: 11px; flex-wrap: wrap; }
   .cd-footer span:last-child { color: var(--gold); }
 
@@ -139,6 +152,8 @@
     .cd-hero { padding: 22px 20px 21px; }
     .cd-art { background-position: 59% 36%; }
     .cd-art::after { background: linear-gradient(90deg, rgba(9, 16, 25, .95) 0%, rgba(9, 16, 25, .8) 32%, rgba(9, 16, 25, .23) 82%), linear-gradient(0deg, #0a1018 0%, transparent 50%); }
+    .cd-window[data-event="open"] .cd-art { background-position: 80% 36%; }
+    .cd-window[data-event="open"] .cd-art::after { background: linear-gradient(90deg, rgba(249, 245, 234, .97) 0%, rgba(249, 245, 234, .9) 40%, rgba(249, 245, 234, .5) 70%, rgba(249, 245, 234, .1) 94%), linear-gradient(0deg, #f9f5ea 0%, transparent 50%); }
     .cd-body { padding: 0 20px 19px; }
     .cd-name { font-size: 25px; }
     .cd-id { font-size: 9px; }
@@ -172,12 +187,14 @@
 <body>
 <main id="app"><p class="empty">Loading…</p></main>
 <script>
-// Closed position details for the carry Telegram notifier. The summary
-// travels in the direct link's startapp parameter, which Telegram hands to
-// the page as start_param (and as ?tgWebAppStartParam=); ?d= or #d= opens
-// the page outside Telegram. Format: base64url(deflate-raw(JSON)), version 1
-// (links sent before 2026-11-04) or version 2 (carry-web notify/share-link.mjs).
-// Nothing is fetched or stored; values are shown as the record states them.
+// Position details for the carry Telegram notifier: a closed position, or an
+// open position snapshot sent with the opening card (version 2 with st:'o').
+// The summary travels in the direct link's startapp parameter, which Telegram
+// hands to the page as start_param (and as ?tgWebAppStartParam=); ?d= or #d=
+// opens the page outside Telegram. Format: base64url(deflate-raw(JSON)),
+// version 1 (links sent before 2026-11-04) or version 2 (carry-web
+// notify/share-link.mjs). Nothing is fetched or stored; values are shown as
+// the record states them.
 const CarryDetails = (() => {
   const esc = s => String(s ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch]);
   const DASH = '\u2014', MINUS = '\u2212';
@@ -188,6 +205,7 @@ const CarryDetails = (() => {
     rewind: '<svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>',
     check: '<svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>',
     minus: '<svg viewBox="0 0 24 24"><path d="M5 12h14"/></svg>',
+    clock: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
     right: '<svg viewBox="0 0 24 24"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>',
     up: '<svg viewBox="0 0 24 24"><path d="M7 17 17 7"/><path d="M7 7h10v10"/></svg>',
     down: '<svg viewBox="0 0 24 24"><path d="m7 7 10 10"/><path d="M17 7v10H7"/></svg>',
@@ -204,6 +222,8 @@ const CarryDetails = (() => {
   const t = v => typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : null;
   const s = v => typeof v === 'string' && v ? v : null;
   const lev = v => Number.isInteger(v) && v > 0 && v <= 200 ? v : null;
+  // A holding forecast beyond a year is malformed, not a forecast.
+  const hrs = v => typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= 8784 ? v : null;
 
   /** One display model for both link versions. */
   function normalize(d) {
@@ -224,6 +244,19 @@ const CarryDetails = (() => {
     }
     if (d.v === 2) {
       const g = Array.isArray(d.g) ? d.g : [];
+      if (d.st === 'o') {
+        // Open snapshot from the opening card: n, r, f and h are forecasts
+        // frozen at entry (n excludes funding, f is the funding forecast);
+        // g[2] is the exit target frozen at open. Nothing has closed, so there
+        // is no close reason, close time or exit fill.
+        const target = d.x === 't';
+        return { ...base, version: 2, open: true, reason: null, closed: null, paired: true,
+          ret: n(d.r), retBasis: d.rb === 'm' ? 'margin' : 'notional', retDigits: 4, funding: n(d.f), hours: hrs(d.h),
+          entered: t(d.e), firstFill: null, long: s(d.L), short: s(d.S),
+          entrySignal: n(g[0]), entryFill: n(g[1]), firstLot: d.k === 1,
+          exitRef: target ? n(g[2]) : null, exitKind: target ? 'target' : null, exitParts: null, exitFill: null,
+          legs: null, scaled: 0 };
+      }
       // Only an explicit entry rollback means no hedged pair; a missing entry
       // time on another close is just unknown.
       const entered = t(d.e), paired = base.reason !== 'partial_entry_rollback';
@@ -254,6 +287,8 @@ const CarryDetails = (() => {
     const parts = d ? [[d, 'd'], [h, 'h'], [m, 'm']] : h ? [[h, 'h'], [m, 'm'], [sec, 's']] : m ? [[m, 'm'], [sec, 's']] : [[sec, 's']];
     return parts.filter(([v], i) => v > 0 || i === 0).map(([v, u]) => v + u).join(' ');
   };
+  // A forecast in hours, to the minute: 1.5 -> 1h 30m.
+  const hoursText = h => { if (h == null) return DASH; const minutes = Math.round(h * 60); return minutes ? duration(0, minutes * 60) : '0m'; };
   const ZONE = 'America/Los_Angeles';
   const zoneName = at => new Intl.DateTimeFormat('en-US', { timeZone: ZONE, timeZoneName: 'short' }).formatToParts(new Date(at * 1000)).find(p => p.type === 'timeZoneName')?.value ?? 'PT';
   const stamp = at => {
@@ -290,7 +325,7 @@ const CarryDetails = (() => {
   // Signed difference in percentage points; entry: a wider fill gap is
   // better, exit: a narrower one. It includes market movement between the
   // reference and the fills, so it reads "vs signal/plan".
-  function comparison(title, refLabel, ref, fillLabel, fill, widerIsBetter, missing) {
+  function comparison(title, refLabel, ref, fillLabel, fill, widerIsBetter, missing, unavailable = 'Unavailable') {
     const delta = ref != null && fill != null ? Math.round((fill - ref) * 1e5) / 1e3 : null;
     const good = delta == null || delta === 0 ? null : (delta > 0) === widerIsBetter;
     const cls = delta == null ? 'cd-unknown' : good == null ? '' : good ? 'cd-positive' : 'cd-negative';
@@ -301,12 +336,13 @@ const CarryDetails = (() => {
       + '<div class="cd-arrow">' + icon.right + '</div>'
       + '<dl><dt>' + esc(fillLabel) + '</dt><dd class="' + (fill == null ? 'cd-unknown' : cls) + '">' + pct(fill, 3) + '</dd></dl></div>'
       + '<div class="cd-delta ' + cls + '">' + (delta == null || good == null ? icon.minus : good ? icon.up : icon.down)
-      + '<span>' + esc(text) + '</span><span>' + (delta == null ? 'Unavailable' : 'vs ' + esc(basis)) + '</span></div></section>';
+      + '<span>' + esc(text) + '</span><span>' + (delta == null ? esc(unavailable) : 'vs ' + esc(basis)) + '</span></div></section>';
   }
 
   const legNote = state => ({ none: 'Not filled', partial: 'Partly filled', full: 'Filled', 'partial-flat': 'Partly filled · closed back', 'full-flat': 'Filled · closed back', filled: 'Fill recorded', 'filled-exit': 'Filled · closed back', 'no-price': 'No fill price recorded' })[state] ?? '';
 
   function render(d) {
+    if (d.open) return renderOpen(d);
     const rollback = ROLLBACKS.includes(d.reason);
     // Art and marks follow the close reason for rollbacks and the recorded
     // Net otherwise; an unknown Net implies neither profit nor loss.
@@ -365,6 +401,50 @@ const CarryDetails = (() => {
       + '<dl class="cd-lifecycle"><div><dt>' + start[0] + '</dt>' + stamp(start[1]) + '</div><div><dt>Closed</dt>' + stamp(d.closed) + '</div></dl>'
       + '<div class="cd-close"><div><div class="cd-close-label">Close reason</div><p>' + esc(reasonText(d.reason)) + '</p></div><div class="cd-close-mark" aria-hidden="true">' + (rollback ? icon.rewind : result === 'positive' ? icon.check : icon.minus) + '</div></div>'
       + '<div class="cd-footer"><span>' + (d.funding != null ? 'Net includes recorded funding' : 'Funding not fully recorded') + '</span><span>Snapshot at notification · ' + esc(zone) + '</span></div>'
+      + '</div></article>';
+  }
+
+  // Open snapshot: the same report with forecasts in place of results; the
+  // exit compares against the frozen target and has no fill yet.
+  function renderOpen(d) {
+    const result = d.net == null ? 'unknown' : d.net < 0 ? 'negative' : 'positive';
+    const status = 'OPEN' + (d.mode ? ' · ' + modeLabel(d.mode) : '');
+    const no = number(d.id);
+    const venue = (side, name, right) => {
+      const tag = '<span class="cd-side cd-' + side + '">' + side.toUpperCase() + '</span>', label = '<strong>' + esc(name ?? DASH) + '</strong>';
+      return '<div class="cd-venue">' + (right ? label + tag : tag + label) + '</div>';
+    };
+    const holding = hoursText(d.hours);
+    const start = d.entered != null ? ['Opened', d.entered] : ['Entry started', d.opened];
+    const zone = start[1] != null ? zoneName(start[1]) : 'PT';
+    const netText = signed(d.net, 4), retText = signedPct(d.ret, d.retDigits);
+
+    return '<article class="cd-window" data-event="open" data-result="' + result + '" aria-label="Open position details">'
+      + '<header class="cd-hero"><div class="cd-art" aria-hidden="true"></div>'
+      + '<div class="cd-brandline"><div class="cd-brand">Carry</div><div class="cd-state"><span class="cd-dot"></span><span class="cd-state-text">' + esc(status) + '</span></div></div>'
+      + '<h1 class="cd-name">' + esc(pair(d.symbol)) + '</h1>'
+      + '<div class="cd-position">' + (no ? '<span class="cd-number">#' + esc(no) + '</span><span aria-hidden="true">·</span>' : '') + '<span class="cd-id">' + esc(d.id ?? DASH) + '</span></div></header>'
+      + '<div class="cd-body">'
+      + '<div class="cd-summary"><div><div class="cd-label">Expected net</div><p class="cd-net"><strong class="cd-amount' + (d.net != null && d.net < 0 ? ' cd-negative' : d.net == null ? ' cd-unknown' : '') + wide(netText, 8) + '">' + netText + '</strong><span class="cd-currency">USDT</span></p>'
+      + '<span class="cd-note">' + (d.net != null ? 'Forecast · excl. funding' : 'Not forecast') + '</span></div>'
+      + '<div class="cd-return"><div class="cd-label">Expected return</div><strong class="' + tone(d.ret) + wide(retText, 8) + '">' + retText + '</strong><span>' + (d.ret != null ? 'on ' + d.retBasis : 'Not forecast') + '</span></div></div>'
+      + '<div class="cd-venues" aria-label="Exchanges and position directions">' + venue('long', d.long, false)
+      + '<div class="cd-bridge" aria-hidden="true">' + icon.swap + '</div>' + venue('short', d.short, true) + '</div>'
+      + '<dl class="cd-overview">'
+      + '<div><dt>Capital · planned</dt><dd class="' + (d.capital == null ? 'cd-unknown' : '') + '">' + money(d.capital) + (d.capital == null ? '' : ' <span class="cd-unit">USDT</span>') + '</dd></div>'
+      + '<div><dt>Leverage</dt><dd class="' + (d.leverage == null ? 'cd-unknown' : '') + '">' + (d.leverage == null ? DASH : d.leverage + '×') + '</dd></div>'
+      + '<div><dt>Holding · forecast</dt><dd class="' + (d.hours == null ? 'cd-unknown' : '') + '">' + esc(holding) + '</dd></div>'
+      + '<div><dt>Funding · forecast</dt><dd class="' + tone(d.funding) + '">' + signed(d.funding, 4) + (d.funding == null ? '' : ' <span class="cd-unit">USDT</span>') + '</dd></div>'
+      + '</dl>'
+      + '<div class="cd-section-title"><h2>Spread execution</h2><span>Signal or target → actual fill</span></div>'
+      + '<div class="cd-execution">'
+      + comparison('Entry', 'Signal', d.entrySignal, d.firstLot ? 'Actual · first lot' : 'Actual', d.entryFill, true, 'Not recorded')
+      + comparison('Exit', 'Target', d.exitRef, 'Actual', null, false, 'Position still open', 'Pending')
+      + '</div>'
+      + '<div class="cd-section-title"><h2>Position timeline</h2><span>Pacific time</span></div>'
+      + '<dl class="cd-lifecycle"><div><dt>' + start[0] + '</dt>' + stamp(start[1]) + '</div><div><dt>Closed</dt><dd class="cd-unknown">Still open</dd></div></dl>'
+      + '<div class="cd-close"><div><div class="cd-close-label">Status</div><p>Open at notification</p></div><div class="cd-close-mark" aria-hidden="true">' + icon.clock + '</div></div>'
+      + '<div class="cd-footer"><span>Forecast frozen at entry · excludes later scale-ins</span><span>Snapshot at opening · ' + esc(zone) + '</span></div>'
       + '</div></article>';
   }
 
