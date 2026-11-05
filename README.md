@@ -22,6 +22,12 @@ OPEN status: expected net (excluding funding) and expected return on margin
 or notional, forecast holding time and funding, the entry spread against the
 signal, and the exit target frozen at open with the exit marked as still open.
 These forecasts are frozen at entry and leave out later scale-ins.
+Its Entry slippage section shows each leg's first lot from the signal midpoint
+through the planned book VWAP to the actual fill (fill against plan, USDT impact
+against the midpoint, order type and which leg went first), planned against
+actual slippage and fees, and the time from the signal to the first order, the
+first fill and the hedge; opening links sent before it say the prices are not
+in the link.
 
 `assets/` holds the artwork (recompressed from carry-web `share-cards/assets`)
 and Latin subsets of Manrope and Kaushan Script with their licenses.
