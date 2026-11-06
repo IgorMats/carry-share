@@ -239,3 +239,26 @@ test('capital shows the actual entry notional when the link carries it, planned 
   assert.match(openText, /Capital · actual 119\.19 USDT/);
   assert.match(words(await open(encode(openV2({ ca: 'x' })))), /Capital · planned 500\.00 USDT/, 'a malformed actual falls back to the planned figure');
 });
+
+test('a refreshed open link shows the current gap as the exit Actual, and the actual exit once closed', async () => {
+  const live = words(await open(encode(openV2({ cg: [0.0018, 0.0031], ct: 1793735993 }))));
+  assert.match(live, /Exit Target 0\.180% Actual 0\.310% .*0\.130 pp to target as of \d\d:\d\d/);
+  assert.ok(!/worse vs target|better vs target/.test(live), 'an open gap is a distance, not a result');
+  assert.match(live, /Closed Still open/); assert.match(live, /Status Open /); assert.match(live, /Updated \d\d:\d\d · P[SD]T/);
+  assert.match(words(await open(encode(openV2({ cg: [0.0018, 0.0015], ct: 1793735993 })))), /Target reached as of/);
+  const closed = words(await open(encode(openV2({ cg: [0.0018, 0.0016], ct: 1793735993, cs: 'c' }))));
+  assert.match(closed, /Exit Target 0\.180% Actual 0\.160% .*0\.020 pp better vs target/);
+  assert.match(closed, /Closed \d\d:\d\d:\d\d/); assert.match(closed, /Status Closed/); assert.match(closed, /Updated at close/);
+  // Without a time the gap is not trusted; older links keep the dash.
+  assert.match(words(await open(encode(openV2({ cg: [0.0018, 0.0031] })))), /Actual \u2014 .*Position still open/);
+});
+
+test('the target is reached on unrounded values, never by rounding', async () => {
+  const near = words(await open(encode(openV2({ cg: [0.0018, 0.001801], ct: 1793735993 }))));
+  assert.ok(!near.includes('Target reached')); assert.match(near, /0\.000 pp to target/);
+});
+
+test('equal rounded gaps read as reached only with the notifier mark', async () => {
+  assert.ok(!words(await open(encode(openV2({ cg: [0.0018, 0.0018], ct: 1793735993 })))).includes('Target reached'));
+  assert.match(words(await open(encode(openV2({ cg: [0.0018, 0.0018], ct: 1793735993, cx: 1 })))), /Target reached/);
+});

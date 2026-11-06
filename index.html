@@ -253,11 +253,17 @@ const CarryDetails = (() => {
         // g[2] is the exit target frozen at open. Nothing has closed, so there
         // is no close reason, close time or exit fill.
         const target = d.x === 't';
+        // The notifier refreshes the link while the position is open: cg is
+        // [current exit target, the engine's current midpoint gap] at ct; with
+        // cs 'c' it is the target and the actual exit fill gap at the close.
+        const cg = Array.isArray(d.cg) ? d.cg : [], at = t(d.ct), now = at != null ? n(cg[1]) : null;
+        const closedNow = d.cs === 'c' && at != null;
         return { ...base, version: 2, open: true, reason: null, closed: null, paired: true,
           ret: n(d.r), retBasis: d.rb === 'm' ? 'margin' : 'notional', retDigits: 4, funding: n(d.f), hours: hrs(d.h),
           entered: t(d.e), firstFill: null, long: s(d.L), short: s(d.S),
           entrySignal: n(g[0]), entryFill: n(g[1]), firstLot: d.k === 1,
-          exitRef: target ? n(g[2]) : null, exitKind: target ? 'target' : null, exitParts: null, exitFill: null,
+          exitRef: at != null && n(cg[0]) != null ? n(cg[0]) : target ? n(g[2]) : null, exitKind: target ? 'target' : null, exitParts: null,
+          exitFill: now, currentAt: closedNow ? null : now != null ? at : null, closedAt: closedNow ? at : null, reached: d.cx === 1,
           legs: null, scaled: 0 };
       }
       // Only an explicit entry rollback means no hedged pair; a missing entry
@@ -328,19 +334,25 @@ const CarryDetails = (() => {
   // Signed difference in percentage points; entry: a wider fill gap is
   // better, exit: a narrower one. It includes market movement between the
   // reference and the fills, so it reads "vs signal/plan".
-  function comparison(title, refLabel, ref, fillLabel, fill, widerIsBetter, missing, unavailable = 'Unavailable') {
+  // toTarget: an open position's current gap against its exit target, read
+  // as the distance left rather than better or worse; the note is its time.
+  function comparison(title, refLabel, ref, fillLabel, fill, widerIsBetter, missing, unavailable = 'Unavailable', toTarget = null, marked = false) {
     const delta = ref != null && fill != null ? Math.round((fill - ref) * 1e5) / 1e3 : null;
-    const good = delta == null || delta === 0 ? null : (delta > 0) === widerIsBetter;
+    // Reached as the notifier decided on unrounded values (cx), or plainly below the target.
+    const reached = toTarget && delta != null && (marked || fill < ref);
+    const good = toTarget ? (reached ? true : null) : delta == null || delta === 0 ? null : (delta > 0) === widerIsBetter;
     const cls = delta == null ? 'cd-unknown' : good == null ? '' : good ? 'cd-positive' : 'cd-negative';
     const basis = refLabel.split(' ')[0].toLowerCase();
-    const text = delta == null ? missing : delta === 0 ? 'Same as ' + basis : Math.abs(delta).toFixed(3) + ' pp ' + (good ? 'better' : 'worse');
+    const text = delta == null ? missing : toTarget ? (reached ? 'Target reached' : delta.toFixed(3) + ' pp to target')
+      : delta === 0 ? 'Same as ' + basis : Math.abs(delta).toFixed(3) + ' pp ' + (good ? 'better' : 'worse');
     return '<section class="cd-fill" aria-label="' + esc(title + ': ' + text) + '"><h3>' + esc(title) + '</h3>'
       + '<div class="cd-comparison"><dl><dt>' + esc(refLabel) + '</dt><dd class="' + (ref == null ? 'cd-unknown' : '') + '">' + pct(ref, 3) + '</dd></dl>'
       + '<div class="cd-arrow">' + icon.right + '</div>'
       + '<dl><dt>' + esc(fillLabel) + '</dt><dd class="' + (fill == null ? 'cd-unknown' : cls) + '">' + pct(fill, 3) + '</dd></dl></div>'
       + '<div class="cd-delta ' + cls + '">' + (delta == null || good == null ? icon.minus : good ? icon.up : icon.down)
-      + '<span>' + esc(text) + '</span><span>' + (delta == null ? esc(unavailable) : 'vs ' + esc(basis)) + '</span></div></section>';
+      + '<span>' + esc(text) + '</span><span>' + (delta == null ? esc(unavailable) : toTarget ? esc(toTarget) : 'vs ' + esc(basis)) + '</span></div></section>';
   }
+  const clock = at => new Date(at * 1000).toLocaleTimeString('en-GB', { timeZone: ZONE, hour: '2-digit', minute: '2-digit' });
 
   const legNote = state => ({ none: 'Not filled', partial: 'Partly filled', full: 'Filled', 'partial-flat': 'Partly filled · closed back', 'full-flat': 'Filled · closed back', filled: 'Fill recorded', 'filled-exit': 'Filled · closed back', 'no-price': 'No fill price recorded' })[state] ?? '';
 
@@ -442,12 +454,14 @@ const CarryDetails = (() => {
       + '<div class="cd-section-title"><h2>Spread execution</h2><span>Signal or target → actual fill</span></div>'
       + '<div class="cd-execution">'
       + comparison('Entry', 'Signal', d.entrySignal, d.firstLot ? 'Actual · first lot' : 'Actual', d.entryFill, true, 'Not recorded')
-      + comparison('Exit', 'Target', d.exitRef, 'Actual', null, false, 'Position still open', 'Pending')
+      + (d.closedAt != null ? comparison('Exit', 'Target', d.exitRef, 'Actual', d.exitFill, false, 'Not recorded')
+        : comparison('Exit', 'Target', d.exitRef, 'Actual', d.currentAt != null ? d.exitFill : null, false, 'Position still open', 'Pending',
+          d.currentAt != null ? 'as of ' + clock(d.currentAt) : null, d.reached))
       + '</div>'
       + '<div class="cd-section-title"><h2>Position timeline</h2><span>Pacific time</span></div>'
-      + '<dl class="cd-lifecycle"><div><dt>' + start[0] + '</dt>' + stamp(start[1]) + '</div><div><dt>Closed</dt><dd class="cd-unknown">Still open</dd></div></dl>'
-      + '<div class="cd-close"><div><div class="cd-close-label">Status</div><p>Open at notification</p></div><div class="cd-close-mark" aria-hidden="true">' + icon.clock + '</div></div>'
-      + '<div class="cd-footer"><span>Forecast frozen at entry · excludes later scale-ins</span><span>Snapshot at opening · ' + esc(zone) + '</span></div>'
+      + '<dl class="cd-lifecycle"><div><dt>' + start[0] + '</dt>' + stamp(start[1]) + '</div><div><dt>Closed</dt>' + (d.closedAt != null ? stamp(d.closedAt) : '<dd class="cd-unknown">Still open</dd>') + '</div></dl>'
+      + '<div class="cd-close"><div><div class="cd-close-label">Status</div><p>' + (d.closedAt != null ? 'Closed' : d.currentAt != null ? 'Open' : 'Open at notification') + '</p></div><div class="cd-close-mark" aria-hidden="true">' + icon.clock + '</div></div>'
+      + '<div class="cd-footer"><span>Forecast frozen at entry · excludes later scale-ins</span><span>' + (d.closedAt != null ? 'Updated at close' : d.currentAt != null ? 'Updated ' + esc(clock(d.currentAt)) : 'Snapshot at opening') + ' · ' + esc(zone) + '</span></div>'
       + '</div></article>';
   }
 
