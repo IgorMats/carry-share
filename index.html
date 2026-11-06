@@ -241,12 +241,17 @@ const CarryDetails = (() => {
       const legV1 = l => typeof l[1] === 'string' && l[1] ? (typeof l[2] === 'string' && l[2] ? 'filled-exit' : 'filled') : 'no-price';
       return { ...base, version: 1, paired, ret: paired ? n(d.r) : null, retDigits: 3, funding: n(d.f),
         entered: paired ? base.opened : null, firstFill: null, long: s(L[0]), short: s(S[0]),
-        entrySignal: n(sp[0]), entryFill: paired ? n(sp[1]) : null, firstLot: false,
+        entryRef: n(sp[0]), entryKind: 'signal', entryFill: paired ? n(sp[1]) : null, firstLot: false,
         exitRef: null, exitKind: null, exitParts: null, exitFill: paired ? n(sp[2]) : null,
         legs: paired ? null : [legV1(L), legV1(S)], scaled: Array.isArray(d.sc) ? d.sc.length : 0 };
     }
     if (d.v === 2) {
       const g = Array.isArray(d.g) ? d.g : [];
+      // g[0] is the entry reference: with ep 1 the gap of the entry plan's
+      // executable prices, the prices the entry was planned and its slippage
+      // is measured at; links sent before ep carry the decision midpoint gap
+      // (the signal).
+      const entryKind = d.ep === 1 ? 'plan' : 'signal';
       if (d.st === 'o') {
         // Open snapshot from the opening card: n, r, f and h are forecasts
         // frozen at entry (n excludes funding, f is the funding forecast);
@@ -261,7 +266,7 @@ const CarryDetails = (() => {
         return { ...base, version: 2, open: true, reason: null, closed: null, paired: true,
           ret: n(d.r), retBasis: d.rb === 'm' ? 'margin' : 'notional', retDigits: 4, funding: n(d.f), hours: hrs(d.h),
           entered: t(d.e), firstFill: null, long: s(d.L), short: s(d.S),
-          entrySignal: n(g[0]), entryFill: n(g[1]), firstLot: d.k === 1,
+          entryRef: n(g[0]), entryKind, entryFill: n(g[1]), firstLot: d.k === 1,
           exitRef: at != null && n(cg[0]) != null ? n(cg[0]) : target ? n(g[2]) : null, exitKind: target ? 'target' : null, exitParts: null,
           exitFill: now, currentAt: closedNow ? null : now != null ? at : null, closedAt: closedNow ? at : null, reached: d.cx === 1,
           legs: null, scaled: 0 };
@@ -274,7 +279,7 @@ const CarryDetails = (() => {
       const kind = d.x === 's' ? 'signal' : d.x === 'p' ? 'plan' : null;
       return { ...base, version: 2, paired, ret: paired ? n(d.r) : null, retDigits: 4, funding: n(d.f),
         entered: paired ? entered : null, firstFill: paired ? null : t(d.u), long: s(d.L), short: s(d.S),
-        entrySignal: n(g[0]), entryFill: paired ? n(g[1]) : null, firstLot: d.k === 1,
+        entryRef: n(g[0]), entryKind, entryFill: paired ? n(g[1]) : null, firstLot: d.k === 1,
         exitRef: paired && kind ? n(g[2]) : null, exitKind: kind, exitParts: Number.isInteger(d.xp) && d.xp > 1 ? d.xp : null,
         exitFill: paired ? n(g[3]) : null,
         legs: paired ? null : Array.isArray(d.q) ? [legV2(d.q[0]), legV2(d.q[1])] : [null, null],
@@ -344,7 +349,7 @@ const CarryDetails = (() => {
     const cls = delta == null ? 'cd-unknown' : good == null ? '' : good ? 'cd-positive' : 'cd-negative';
     const basis = refLabel.split(' ')[0].toLowerCase();
     const text = delta == null ? missing : toTarget ? (reached ? 'Target reached' : delta.toFixed(3) + ' pp to target')
-      : delta === 0 ? 'Same as ' + basis : Math.abs(delta).toFixed(3) + ' pp ' + (good ? 'better' : 'worse');
+      : delta === 0 ? 'No difference' : Math.abs(delta).toFixed(3) + ' pp ' + (good ? 'better' : 'worse');
     return '<section class="cd-fill" aria-label="' + esc(title + ': ' + text) + '"><h3>' + esc(title) + '</h3>'
       + '<div class="cd-comparison"><dl><dt>' + esc(refLabel) + '</dt><dd class="' + (ref == null ? 'cd-unknown' : '') + '">' + pct(ref, 3) + '</dd></dl>'
       + '<div class="cd-arrow">' + icon.right + '</div>'
@@ -353,6 +358,10 @@ const CarryDetails = (() => {
       + '<span>' + esc(text) + '</span><span>' + (delta == null ? esc(unavailable) : toTarget ? esc(toTarget) : 'vs ' + esc(basis)) + '</span></div></section>';
   }
   const clock = at => new Date(at * 1000).toLocaleTimeString('en-GB', { timeZone: ZONE, hour: '2-digit', minute: '2-digit' });
+
+  const refLabel = kind => kind === 'plan' ? 'Plan' : 'Signal';
+  // "Plan", "Plan or signal": the references the section compares against.
+  const refList = (...labels) => { const list = [...new Set(labels.map(l => l.toLowerCase()))].join(' or '); return list[0].toUpperCase() + list.slice(1); };
 
   const legNote = state => ({ none: 'Not filled', partial: 'Partly filled', full: 'Filled', 'partial-flat': 'Partly filled · closed back', 'full-flat': 'Filled · closed back', filled: 'Fill recorded', 'filled-exit': 'Filled · closed back', 'no-price': 'No fill price recorded' })[state] ?? '';
 
@@ -384,6 +393,7 @@ const CarryDetails = (() => {
     const holdingLabel = unpaired ? 'Time to unwind' : 'Holding time';
     const holding = unpaired ? duration(d.firstFill, d.closed) : duration(d.entered, d.closed);
     const exitRefLabel = d.exitKind === 'plan' ? 'Plan' + (d.exitParts ? ' · ' + d.exitParts + ' parts' : '') : 'Signal';
+    const entryRefLabel = refLabel(d.entryKind);
     const zone = d.closed != null ? zoneName(d.closed) : 'PT';
     const netText = signed(d.net, 4), retText = signedPct(d.ret, d.retDigits);
     // The first timeline stamp: the hedged entry, or the attempt when no pair
@@ -407,9 +417,9 @@ const CarryDetails = (() => {
       + '<div><dt>' + holdingLabel + '</dt><dd class="' + (holding === DASH ? 'cd-unknown' : '') + '">' + esc(holding) + '</dd></div>'
       + '<div><dt>Funding · actual</dt><dd class="' + tone(d.funding) + '">' + signed(d.funding, 4) + (d.funding == null ? '' : ' <span class="cd-unit">USDT</span>') + '</dd></div>'
       + '</dl>'
-      + '<div class="cd-section-title"><h2>Spread execution</h2><span>' + (d.exitKind === 'plan' ? 'Signal or plan' : 'Signal') + ' → actual fill</span></div>'
+      + '<div class="cd-section-title"><h2>Spread execution</h2><span>' + refList(entryRefLabel, d.exitKind === 'plan' ? 'Plan' : 'Signal') + ' → actual fill</span></div>'
       + '<div class="cd-execution">'
-      + comparison('Entry', 'Signal', d.entrySignal, d.firstLot ? 'Actual · first lot' : 'Actual', d.entryFill, true, unpaired ? 'No paired entry' : 'Not recorded')
+      + comparison('Entry', entryRefLabel, d.entryRef, d.firstLot ? 'Actual · first lot' : 'Actual', d.entryFill, true, unpaired ? 'No paired entry' : 'Not recorded')
       + comparison('Exit', exitRefLabel, d.exitRef, 'Actual', d.exitFill, false, unpaired ? 'No paired exit' : d.exitFill != null ? 'No recorded ' + exitRefLabel.split(' ')[0].toLowerCase() : 'Not recorded')
       + '</div>'
       + '<div class="cd-section-title"><h2>Position timeline</h2><span>Pacific time</span></div>'
@@ -451,9 +461,9 @@ const CarryDetails = (() => {
       + '<div><dt>Holding · forecast</dt><dd class="' + (d.hours == null ? 'cd-unknown' : '') + '">' + esc(holding) + '</dd></div>'
       + '<div><dt>Funding · forecast</dt><dd class="' + tone(d.funding) + '">' + signed(d.funding, 4) + (d.funding == null ? '' : ' <span class="cd-unit">USDT</span>') + '</dd></div>'
       + '</dl>'
-      + '<div class="cd-section-title"><h2>Spread execution</h2><span>Signal or target → actual fill</span></div>'
+      + '<div class="cd-section-title"><h2>Spread execution</h2><span>' + refList(refLabel(d.entryKind), 'Target') + ' → actual fill</span></div>'
       + '<div class="cd-execution">'
-      + comparison('Entry', 'Signal', d.entrySignal, d.firstLot ? 'Actual · first lot' : 'Actual', d.entryFill, true, 'Not recorded')
+      + comparison('Entry', refLabel(d.entryKind), d.entryRef, d.firstLot ? 'Actual · first lot' : 'Actual', d.entryFill, true, 'Not recorded')
       + (d.closedAt != null ? comparison('Exit', 'Target', d.exitRef, 'Actual', d.exitFill, false, 'Not recorded')
         : comparison('Exit', 'Target', d.exitRef, 'Actual', d.currentAt != null ? d.exitFill : null, false, 'Position still open', 'Pending',
           d.currentAt != null ? 'as of ' + clock(d.currentAt) : null, d.reached))

@@ -83,6 +83,23 @@ test('v2 ordinary gain and loss: colours follow sign; spread quality is separate
   assert.match(lossText, /Maximum holding time reached/);
 });
 
+test('v2 with ep: the entry is compared with its plan, and the subtitle names every reference once', async () => {
+  const text = words(await open(encode(v2({ ep: 1 }))));
+  assert.match(text, /Entry Plan 0\.842% Actual 0\.816% .*0\.026 pp worse vs plan/);
+  assert.match(text, /Spread execution Plan → actual fill/);
+  assert.ok(!text.includes('Signal'), 'nothing is labelled a signal when both references are plans');
+  const signalExit = words(await open(encode(v2({ ep: 1, x: 's' }))));
+  assert.match(signalExit, /Plan or signal → actual fill/);
+  assert.match(signalExit, /Entry Plan 0\.842%/); assert.match(signalExit, /Exit Signal 0\.180%/);
+  const rollback = v2({ ep: 1, cr: 'partial_entry_rollback', r: null, e: null, g: [0.00842, null, null, null], q: [7, 1] });
+  delete rollback.x;
+  assert.match(words(await open(encode(rollback))), /Entry Plan 0\.842% Actual \u2014 .*No paired entry/);
+  // A fill exactly at the plan reads once, not 'Same as plan vs plan'.
+  assert.match(words(await open(encode(v2({ ep: 1, g: [0.00842, 0.00842, 0.0018, 0.00164] })))), /Actual 0\.842% No difference vs plan/);
+  // Any other ep value is an older link: the signal.
+  assert.match(words(await open(encode(v2({ ep: 2 })))), /Entry Signal 0\.842%/);
+});
+
 test('v2 entry rollback: panic art by reason even with a profit, real leg states, no paired values', async () => {
   const data = v2({ cr: 'partial_entry_rollback', n: 0.012, r: null, f: 0, e: null, u: 1793727673, c: 1793727687, g: [0.00842, null, null, null], q: [7, 1] });
   delete data.x;
@@ -166,6 +183,13 @@ test('open snapshot: forecasts, frozen target, still open', async () => {
     assert.ok(!text.includes(absent), absent);
 });
 
+test('open snapshot with ep: entry against the plan', async () => {
+  const text = words(await open(encode(openV2({ ep: 1 }))));
+  assert.match(text, /Plan or target → actual fill/);
+  assert.match(text, /Entry Plan 0\.842% Actual 0\.816% .*0\.026 pp worse vs plan/);
+  assert.ok(!text.includes('Signal'));
+});
+
 test('open snapshot: forecast tones, return basis, short holding', async () => {
   const loss = await open(encode(openV2({ n: -1.2, r: -0.0024, f: -0.05, rb: 'm', h: 0.25 }))), text = words(loss);
   assert.equal(attr(loss, 'data-event'), 'open'); assert.equal(attr(loss, 'data-result'), 'negative');
@@ -213,6 +237,10 @@ test('notifier payloads render', { skip: !fs.existsSync(notifier) && 'carry-web 
   const text = words(await open(link.url.split('startapp=')[1]));
   assert.match(text, /LONG OKX Filled · closed back/); assert.match(text, /BingX SHORT Not filled/);
   assert.match(text, /\u22120\.3100 USDT/); assert.match(text, /Time to unwind 17s/); assert.match(text, /Signal 0\.333%/);
+  // With the entry plan's prices the link carries the plan, and the page names it.
+  const planned = { ...p, entry_calculation: { ...p.entry_calculation, long_entry_price: '3001', short_entry_price: '3008' } };
+  const plannedText = words(await open(shareLink(planned, { bot: 'b', app: 'share', kind: 'miniApp' }).url.split('startapp=')[1]));
+  assert.match(plannedText, /Entry Plan 0\.233%/); assert.ok(!plannedText.includes('Entry Signal'));
 });
 
 // The open encoder round trip, once the notifier exports openSharePayload.
