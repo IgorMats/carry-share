@@ -11,7 +11,8 @@ Nothing is fetched or stored: the page only decodes and renders what the link
 carries. Open `index.html?d=<payload>` (or `#d=`) to view outside Telegram.
 
 The page is a compact report: symbol, position number and ID, Net and Net
-return on notional, venues and directions, planned capital and leverage,
+return on notional, venues and directions, capital at the actual entry fills
+(planned capital for older links) and leverage,
 holding time, actual funding, entry and exit spread against the recorded
 signal (or the exit's planned close prices), timestamps in Pacific time and
 the close reason. Entry and scale rollbacks get the panic art and a short note

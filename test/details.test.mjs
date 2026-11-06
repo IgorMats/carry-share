@@ -231,3 +231,11 @@ test('notifier open payloads render', { skip: typeof openEncoder.openSharePayloa
     assert.match(words(await open(link.url.split('startapp=')[1])), /OPEN · LIVE/);
   }
 });
+
+test('capital shows the actual entry notional when the link carries it, planned otherwise', async () => {
+  const closedText = words(await open(encode(v2({ cap: undefined, ca: 502.1 }))));
+  assert.match(closedText, /Capital · actual 502\.10 USDT/); assert.ok(!closedText.includes('Capital · planned'));
+  const openText = words(await open(encode(openV2({ cap: undefined, ca: 119.19 }))));
+  assert.match(openText, /Capital · actual 119\.19 USDT/);
+  assert.match(words(await open(encode(openV2({ ca: 'x' })))), /Capital · planned 500\.00 USDT/, 'a malformed actual falls back to the planned figure');
+});

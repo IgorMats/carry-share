@@ -228,7 +228,10 @@ const CarryDetails = (() => {
   /** One display model for both link versions. */
   function normalize(d) {
     if (!d || typeof d !== 'object') throw new Error('Unrecognized link data');
-    const base = { id: s(d.id), symbol: s(d.s), mode: s(d.m), reason: s(d.cr), net: n(d.n), capital: n(d.cap), leverage: lev(d.lv), opened: t(d.o), closed: t(d.c) };
+    // Capital: ca is the notional at the actual entry fills, cap the planned
+    // notional (links sent before ca, or fills the notifier could not price).
+    const actual = n(d.ca);
+    const base = { id: s(d.id), symbol: s(d.s), mode: s(d.m), reason: s(d.cr), net: n(d.n), capital: actual ?? n(d.cap), capitalKind: actual != null ? 'actual' : 'planned', leverage: lev(d.lv), opened: t(d.o), closed: t(d.c) };
     if (d.v === 1) {
       // Version 1: sp = [entry decision midpoint gap, entry fill gap, exit fill
       // gap, frozen target]. The target is not a close-time signal, so the exit
@@ -387,7 +390,7 @@ const CarryDetails = (() => {
       + '<div class="cd-bridge" aria-hidden="true">' + (unpaired ? icon.unlink : icon.swap) + '</div>' + venue('short', d.short, legs[1], true) + '</div>'
       + callout
       + '<dl class="cd-overview">'
-      + '<div><dt>Capital · planned</dt><dd class="' + (d.capital == null ? 'cd-unknown' : '') + '">' + money(d.capital) + (d.capital == null ? '' : ' <span class="cd-unit">USDT</span>') + '</dd></div>'
+      + '<div><dt>Capital · ' + d.capitalKind + '</dt><dd class="' + (d.capital == null ? 'cd-unknown' : '') + '">' + money(d.capital) + (d.capital == null ? '' : ' <span class="cd-unit">USDT</span>') + '</dd></div>'
       + '<div><dt>' + (unpaired ? 'Leverage · planned' : 'Leverage') + '</dt><dd class="' + (d.leverage == null ? 'cd-unknown' : '') + '">' + (d.leverage == null ? DASH : d.leverage + '×') + '</dd></div>'
       + '<div><dt>' + holdingLabel + '</dt><dd class="' + (holding === DASH ? 'cd-unknown' : '') + '">' + esc(holding) + '</dd></div>'
       + '<div><dt>Funding · actual</dt><dd class="' + tone(d.funding) + '">' + signed(d.funding, 4) + (d.funding == null ? '' : ' <span class="cd-unit">USDT</span>') + '</dd></div>'
@@ -431,7 +434,7 @@ const CarryDetails = (() => {
       + '<div class="cd-venues" aria-label="Exchanges and position directions">' + venue('long', d.long, false)
       + '<div class="cd-bridge" aria-hidden="true">' + icon.swap + '</div>' + venue('short', d.short, true) + '</div>'
       + '<dl class="cd-overview">'
-      + '<div><dt>Capital · planned</dt><dd class="' + (d.capital == null ? 'cd-unknown' : '') + '">' + money(d.capital) + (d.capital == null ? '' : ' <span class="cd-unit">USDT</span>') + '</dd></div>'
+      + '<div><dt>Capital · ' + d.capitalKind + '</dt><dd class="' + (d.capital == null ? 'cd-unknown' : '') + '">' + money(d.capital) + (d.capital == null ? '' : ' <span class="cd-unit">USDT</span>') + '</dd></div>'
       + '<div><dt>Leverage</dt><dd class="' + (d.leverage == null ? 'cd-unknown' : '') + '">' + (d.leverage == null ? DASH : d.leverage + '×') + '</dd></div>'
       + '<div><dt>Holding · forecast</dt><dd class="' + (d.hours == null ? 'cd-unknown' : '') + '">' + esc(holding) + '</dd></div>'
       + '<div><dt>Funding · forecast</dt><dd class="' + tone(d.funding) + '">' + signed(d.funding, 4) + (d.funding == null ? '' : ' <span class="cd-unit">USDT</span>') + '</dd></div>'
